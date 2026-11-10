@@ -1,0 +1,208 @@
+/* =========================================================================
+   Giao dien 1 - Website khach hang (mot cot, uu tien dien thoai, toi da 720px)
+   Tien to lop: .cu-
+   ========================================================================= */
+.cu-site { display: flex; flex-direction: column; }
+.cu-site .site-main { width: 100%; padding-bottom: 32px; }
+
+/* ---------- Header ---------- */
+.cu-brand { min-width: 0; }
+.cu-brand .brand-mark { width: 36px; height: 36px; border-radius: 10px; font-size: 14px; }
+.cu-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.cu-brand-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cu-open { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: var(--text-3); white-space: nowrap; }
+.cu-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-4); display: inline-block; }
+.cu-dot.on { background: var(--success); box-shadow: 0 0 0 3px var(--success-50); }
+.cu-call { flex: 0 0 auto; height: 40px; border-radius: 999px; padding: 0 14px; color: var(--text); }
+.cu-call .ic { color: var(--success); }
+.cu-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.cu-nav button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 6px; white-space: nowrap; }
+.cu-nav button .ic { width: 17px; height: 17px; }
+.cu-nav button.active .ic { color: var(--primary); }
+@media (max-width: 380px) {
+  .cu-call-text { display: none; }
+  .cu-call { width: 40px; padding: 0; }
+  .cu-nav button { font-size: 13px; gap: 5px; }
+}
+
+/* ---------- Hero ---------- */
+.cu-hero { position: relative; overflow: hidden; background: radial-gradient(120% 140% at 100% 0%, #1F4FD8 0%, rgba(31, 79, 216, 0) 55%), linear-gradient(160deg, #101828 0%, #1D2939 100%); padding: 22px 20px; gap: 6px; }
+.cu-hero::after { content: ""; position: absolute; right: -40px; bottom: -60px; width: 200px; height: 200px; border-radius: 50%; border: 28px solid rgba(255, 255, 255, .05); pointer-events: none; }
+.cu-hero h2 { font-size: 22px; line-height: 1.25; position: relative; z-index: 1; }
+.cu-hero p { position: relative; z-index: 1; max-width: 520px; }
+.cu-hero-tag { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: rgba(255, 255, 255, .1); color: #fff; font-size: 12px; font-weight: 600; }
+.cu-hero-meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 13px; color: #D0D5DD; }
+.cu-hero-meta span, .cu-hero-meta a { display: inline-flex; align-items: center; gap: 6px; color: #D0D5DD; }
+.cu-hero-meta a { color: #fff; font-weight: 600; }
+.cu-hero-meta .ic { color: #98A2B3; }
+
+/* ---------- Wizard ---------- */
+.cu-wizard { display: flex; flex-direction: column; gap: 4px; padding: 18px; }
+.cu-wizard .steps { margin-bottom: 8px; }
+.cu-sec { padding: 14px 0; border-top: 1px solid var(--border); }
+.cu-wizard .steps + .cu-sec, .cu-wizard .cu-summary + .cu-sec { border-top: 0; }
+.cu-sec-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+.cu-sec-title .ic { color: var(--text-3); width: 17px; height: 17px; }
+.cu-sec-hint { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--text-3); }
+
+.cu-days { display: grid; grid-template-columns: repeat(7, minmax(64px, 1fr)); gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; margin: -2px; }
+.cu-days::-webkit-scrollbar { display: none; }
+.cu-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 72px; padding: 6px 4px; border: 1px solid var(--border-strong); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); transition: border-color .12s, background .12s; }
+.cu-day:hover { border-color: var(--text-3); }
+.cu-day-name { font-size: 12px; font-weight: 600; color: var(--text-3); white-space: nowrap; }
+.cu-day-num { font-size: 22px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.cu-day-sub { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.cu-day.active { background: var(--text); border-color: var(--text); color: var(--surface); }
+.cu-day.active .cu-day-name, .cu-day.active .cu-day-sub { color: rgba(255, 255, 255, .75); }
+.cu-day.full { background: var(--surface-2); border-style: dashed; }
+.cu-day.full .cu-day-sub { color: var(--danger); font-weight: 600; }
+.cu-day.full.active .cu-day-sub { color: #FDA29B; }
+
+.cu-stepper { border-radius: 999px; }
+.cu-stepper button { width: 48px; height: 48px; }
+.cu-stepper span { min-width: 40px; font-size: 18px; }
+.cu-stepper + .chips .chip { height: 40px; }
+
+.cu-time-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cu-time-grid button { height: 48px; font-size: 15px; transition: border-color .12s, background .12s; }
+.cu-time-grid button:not([disabled]):not(.active):hover { border-color: var(--text-3); }
+.cu-time-grid button[disabled] { background: var(--surface-2); cursor: not-allowed; }
+@media (min-width: 560px) { .cu-time-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.cu-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--text-3); }
+.cu-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.cu-legend i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border-strong); background: var(--surface); }
+.cu-legend .lg-sel { background: var(--text); border-color: var(--text); }
+.cu-legend .lg-off { background: var(--surface-2); opacity: .6; }
+
+.cu-actions { display: flex; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); margin-top: 4px; }
+.cu-actions .btn-primary { margin-left: auto; min-width: 150px; }
+.cu-actions-info { flex: 1; min-width: 0; font-size: 13px; color: var(--text-3); font-weight: 500; }
+.cu-actions-end { justify-content: flex-end; border-top: 0; padding-top: 4px; }
+@media (max-width: 560px) {
+  .cu-actions { position: sticky; bottom: 0; z-index: 5; margin: 4px -18px -18px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); background: var(--surface); border-radius: 0 0 var(--radius-lg) var(--radius-lg); box-shadow: 0 -6px 16px rgba(16, 24, 40, .06); }
+  .cu-actions-end { position: static; box-shadow: none; margin: 0; padding: 4px 0 0; background: transparent; }
+  .cu-actions .btn-primary { flex: 1; min-width: 0; }
+  .cu-actions-info { display: none; }
+}
+
+.cu-summary { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-lg); background: var(--surface-2); margin: 4px 0 6px; }
+.cu-summary > .ic { color: var(--primary); }
+
+/* Khu vuc */
+.cu-area { align-items: center; padding: 12px; gap: 14px; cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }
+.cu-area:not(.disabled):hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
+.cu-area.disabled { opacity: .55; filter: grayscale(.6); }
+.cu-area-img { width: 96px; height: 76px; border-radius: 10px; color: #fff; position: relative; overflow: hidden; }
+.cu-area-img::after { content: ""; position: absolute; inset: auto -20px -30px auto; width: 70px; height: 70px; border-radius: 50%; background: rgba(255, 255, 255, .12); }
+.cu-area-img .ic { position: relative; z-index: 1; }
+.cu-g0 { background: linear-gradient(135deg, #12805C 0%, #0B4A35 100%); }
+.cu-g1 { background: linear-gradient(135deg, #1F4FD8 0%, #163A9E 100%); }
+.cu-g2 { background: linear-gradient(135deg, #6941C6 0%, #3E1C96 100%); }
+.cu-g3 { background: linear-gradient(135deg, #B54708 0%, #7A2E0E 100%); }
+.cu-area-name { font-size: 16px; }
+.cu-area-note { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: var(--text-2); }
+.cu-area-note .ic { color: var(--text-3); margin-top: 1px; width: 14px; height: 14px; }
+.cu-radio { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-strong); flex: 0 0 auto; display: flex; align-items: center; justify-content: center; color: #fff; }
+.cu-area.active .cu-radio { background: var(--primary); border-color: var(--primary); }
+@media (max-width: 420px) { .cu-area-img { width: 72px; height: 64px; } .cu-area { align-items: flex-start; } }
+
+/* Danh sach thong tin */
+.cu-dl { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.cu-dl-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 14px; min-height: 44px; }
+.cu-dl-row:last-child { border-bottom: 0; }
+.cu-dl-row > span:first-child { color: var(--text-3); flex: 0 0 auto; }
+.cu-dl-row > b, .cu-dl-row > span:last-child { text-align: right; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.cu-strong-amt { font-size: 16px; color: var(--primary); font-variant-numeric: tabular-nums; }
+.cu-mono { font-family: var(--mono); letter-spacing: .03em; font-weight: 700; }
+
+/* ---------- Thanh toan coc ---------- */
+.cu-hold { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; border-radius: var(--radius-lg); background: var(--warning-50); border: 1px solid var(--warning-100); color: var(--warning); margin: 4px 0 8px; }
+.cu-hold-label { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.cu-countdown { font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; color: var(--text); margin: 2px 0; }
+.cu-hold .small { color: var(--text-2); }
+.cu-pay { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; padding: 8px 0 14px; }
+.cu-qr { padding: 14px; }
+.cu-qr svg { width: 196px; height: 196px; }
+@media (max-width: 600px) {
+  .cu-pay { grid-template-columns: minmax(0, 1fr); }
+  .cu-qr svg { width: 220px; height: 220px; }
+  .cu-countdown { font-size: 36px; }
+}
+.cu-demo { display: flex; flex-direction: column; gap: 8px; padding: 14px; margin-top: 4px; border: 1px dashed var(--violet); border-radius: var(--radius-lg); background: var(--violet-50); color: var(--text-2); }
+.cu-demo-tag { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: 999px; background: var(--violet-100); color: var(--violet); font-size: 12px; font-weight: 700; }
+.cu-demo .btn-primary { background: var(--violet); border-color: var(--violet); }
+
+/* ---------- Ket qua dat ban ---------- */
+.cu-done { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 28px 20px 20px; }
+.cu-done h3 { font-size: 20px; }
+.cu-done > p { max-width: 460px; }
+.cu-done-ic { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--success-50); color: var(--success); box-shadow: 0 0 0 8px rgba(18, 128, 92, .06); margin-bottom: 6px; }
+.cu-failed .cu-done-ic { background: var(--danger-50); color: var(--danger); box-shadow: 0 0 0 8px rgba(192, 16, 72, .05); }
+.cu-code { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 24px; margin: 8px 0 4px; border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--surface-2); min-width: 240px; }
+.cu-code > span { font-size: 12px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.cu-code > b { font-size: 28px; line-height: 1.2; }
+.cu-done-body { width: 100%; text-align: left; margin-top: 8px; }
+.cu-deposit { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-top: 12px; border-radius: var(--radius-lg); background: var(--success-50); color: var(--success); }
+.cu-deposit .small { color: var(--text-2); }
+.cu-done-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; margin-top: 12px; }
+@media (max-width: 560px) { .cu-done-actions .btn { flex: 1 1 100%; } }
+
+/* ---------- Tra cuu ---------- */
+.cu-inline { display: flex; gap: 8px; align-items: stretch; }
+.cu-inline .input { flex: 1; min-width: 0; }
+.cu-inline .btn { flex: 0 0 auto; }
+.cu-demo-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; color: var(--text-3); margin-top: 10px; }
+.cu-demo-hint .ic { color: var(--violet); }
+.cu-link { border: 0; background: transparent; padding: 4px 0; color: var(--primary); font-weight: 600; font-size: inherit; display: inline-flex; align-items: center; gap: 4px; min-height: 32px; }
+.cu-link:hover { text-decoration: underline; }
+.cu-result-head { font-size: 14px; color: var(--text-2); padding: 0 2px; }
+.cu-bk { overflow: hidden; }
+.cu-bk-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.cu-bk-head b { font-size: 16px; }
+.cu-bk-body { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.cu-bk-when { display: flex; gap: 12px; align-items: flex-start; }
+.cu-bk-when > .ic { color: var(--text-3); margin-top: 2px; }
+.cu-bk-foot { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); }
+
+/* ---------- Ruou gui / OTP ---------- */
+.cu-otp { display: flex; flex-direction: column; gap: 14px; padding: 24px 20px; }
+.cu-otp h3 { font-size: 18px; }
+.cu-otp > p { margin-top: -8px; }
+.cu-step-ic { width: 52px; height: 52px; border-radius: 14px; background: var(--primary-50); color: var(--primary); display: flex; align-items: center; justify-content: center; }
+.cu-otp-input { text-align: center; font-family: var(--mono); font-size: 26px; letter-spacing: .5em; font-weight: 700; height: 60px; padding-left: calc(12px + .5em); }
+.cu-code-input { text-transform: uppercase; font-family: var(--mono); letter-spacing: .12em; font-weight: 700; }
+.cu-code-input::placeholder { letter-spacing: .05em; font-weight: 500; text-transform: none; }
+
+.cu-bottle { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+.cu-bottle-name { font-size: 16px; line-height: 1.3; }
+.cu-level { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 2px; }
+.cu-btl { flex: 0 0 auto; width: 40px; display: flex; flex-direction: column; align-items: center; padding-top: 2px; }
+.cu-btl-neck { width: 12px; height: 18px; border: 2px solid var(--border-strong); border-bottom: 0; border-radius: 3px 3px 0 0; background: var(--surface-2); }
+.cu-btl-body { position: relative; width: 36px; height: 76px; border: 2px solid var(--border-strong); border-radius: 12px 12px 8px 8px; background: var(--surface-2); overflow: hidden; }
+.cu-btl-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, #DC6803 0%, #93370D 100%); }
+
+/* ---------- Hoa don ---------- */
+.cu-bill-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.cu-bill-total span { color: var(--text-3); }
+.cu-bill-total b { font-size: 26px; letter-spacing: -0.02em; }
+.cu-vat table.dt { font-size: 13px; }
+.cu-vat .dt th, .cu-vat .dt td { padding: 8px 10px; }
+.cu-lines { border: 1px solid var(--border); border-radius: var(--radius); padding: 0 12px; }
+.cu-lines summary { cursor: pointer; display: flex; align-items: center; gap: 6px; height: 40px; font-weight: 600; font-size: 13px; color: var(--text-2); list-style: none; }
+.cu-lines summary::-webkit-details-marker { display: none; }
+.cu-lines[open] summary { border-bottom: 1px solid var(--border); }
+.cu-lines .line { font-size: 13px; padding: 8px 0; }
+.cu-lines .line .l-qty { min-width: 56px; color: var(--text-3); font-weight: 600; }
+
+/* ---------- Chan trang ---------- */
+.cu-footer { margin-top: auto; border-top: 1px solid var(--border); background: var(--surface); }
+.cu-footer-in { max-width: 720px; margin: 0 auto; padding: 20px 16px 28px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text-2); }
+
+@media (min-width: 960px) {
+  .site-header-in,
+  .site-nav,
+  .site-main,
+  .cu-footer-in {
+    max-width: 960px;
+  }
+}

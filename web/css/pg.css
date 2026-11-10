@@ -1,0 +1,73 @@
+/* =========================================================================
+   Giao dien 3 - PG Bia (dien thoai, man hinh doc). Tien to lop: .pg-
+   ========================================================================= */
+.pg-kpis .kpi { min-width: 148px; }
+.pg-kpi-unit { font-size: 13px; font-weight: 600; color: var(--text-3); letter-spacing: 0; }
+.pg-kpi-prog { margin: 4px 0 4px; width: 120px; }
+.pg-kpi-prog .progress { height: 6px; }
+
+/* O ban: so lon bia hang tren ban */
+.pg-tile-tag { display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--amber-100); color: var(--amber-700); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.pg-tile-tag .ic { width: 12px; height: 12px; }
+.pg-app .tile .tile-sub { display: flex; flex-direction: column; align-items: flex-start; }
+
+/* Man hinh ban bia */
+.pg-table-head h2 { font-size: 26px; letter-spacing: -0.02em; }
+.pg-table-ic { width: 44px; height: 44px; border-radius: 12px; background: var(--amber-100); color: var(--amber-700); display: flex; align-items: center; justify-content: center; }
+.pg-have { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-strong); display: flex; flex-direction: column; gap: 6px; }
+.pg-have-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
+.pg-have-row { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.pg-sec { margin: 4px 0 -4px; }
+
+.pg-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+@media (min-width: 720px) {
+  .pg-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+}
+.pg-prod { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-sm); transition: border-color .12s, background .12s; }
+.pg-prod.in-cart { border-color: var(--primary); background: var(--primary-50); box-shadow: 0 0 0 1px var(--primary) inset; }
+.pg-prod.sold-out { opacity: .6; }
+.pg-prod-head { display: flex; align-items: flex-start; gap: 10px; }
+.pg-prod-name { font-size: 17px; font-weight: 700; line-height: 1.3; }
+.pg-prod-meta { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.pg-promo { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius); background: var(--success-50); color: var(--success); font-size: 13px; font-weight: 500; }
+.pg-promo b { font-weight: 700; }
+.pg-promo-out { background: var(--warning-50); color: var(--warning); }
+.pg-free-preview { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--violet); font-weight: 500; }
+.pg-prod-actions { display: grid; grid-template-columns: 1fr 1.3fr; gap: 8px; }
+.pg-prod-actions .pg-add { height: 52px; font-size: 15px; }
+.pg-prod-actions .pg-add-wide { grid-column: span 2; }
+.pg-prod-actions .pg-add:last-child:not(.pg-add-wide) { background: var(--text); border-color: var(--text); color: var(--surface); }
+.pg-prod-actions .pg-add:last-child:not(.pg-add-wide):hover { background: #1D2939; }
+.pg-cart-qty { display: inline-flex; align-items: center; gap: 0; border-radius: 999px; background: var(--primary); color: #fff; height: 36px; padding: 0 12px 0 4px; flex: 0 0 auto; }
+.pg-cart-qty span { font-weight: 700; font-size: 16px; min-width: 24px; text-align: center; }
+.pg-minus { width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .2); color: #fff; display: flex; align-items: center; justify-content: center; }
+
+.pg-grid-soft { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 720px) {
+  .pg-grid-soft { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+}
+.pg-grid-soft .pg-prod { padding: 12px; gap: 8px; }
+.pg-grid-soft .pg-prod-name { font-size: 15px; }
+.pg-grid-soft .pg-prod-head { flex-wrap: wrap; }
+.pg-grid-soft .pg-prod-actions { grid-template-columns: minmax(0, 1fr); }
+.pg-grid-soft .pg-prod-actions .pg-add { height: 48px; font-size: 14px; padding: 0 8px; }
+.pg-grid-soft .pg-prod-actions .pg-add-wide { grid-column: auto; }
+.pg-grid-soft .pg-prod-actions .pg-add:last-child:not(.pg-add-wide) { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+
+.pg-cart-clear { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .12); color: #fff; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; margin-left: -6px; }
+.pg-app .cart-bar .btn-primary { padding: 0 14px; }
+
+/* Quy khuyen mai */
+.pg-h2 { font-size: 18px; }
+.pg-quota { display: flex; flex-direction: column; gap: 8px; }
+.pg-quota-num { display: flex; align-items: baseline; gap: 6px; }
+.pg-quota-num b { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.pg-quota-num span { color: var(--text-3); font-size: 13px; }
+.pg-tcode { min-width: 52px; height: 32px; padding: 0 8px; border-radius: var(--radius); background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; white-space: nowrap; }
+.pg-ret-row { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.pg-num { display: inline-flex; align-items: stretch; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; flex: 0 0 auto; background: var(--surface); }
+.pg-num button { width: 44px; height: 48px; border: 0; background: var(--surface-2); display: flex; align-items: center; justify-content: center; color: var(--text-2); }
+.pg-num button:active { background: var(--surface-3); }
+.pg-num .pg-num-input { width: 58px; height: 48px; border: 0; border-radius: 0; text-align: center; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; padding: 0 4px; box-shadow: none; }
+.pg-num .pg-num-input:focus { box-shadow: inset 0 0 0 2px var(--primary-100); }
+.pg-fill { align-self: flex-start; }

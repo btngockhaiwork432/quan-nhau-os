@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mxfile host="app.diagrams.net" type="device" version="24.7.17">
+  <diagram id="diag_as_is_00" name="00_AS_IS_Tong_Quan_Thu_Cong_Truoc_He_Thong">
+    <mxGraphModel dx="1600" dy="950" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4200" pageHeight="1880" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="banner_2" value="&lt;b style='font-size:15px;'&gt;SƠ ĐỒ AS-IS 00 — QUY TRÌNH TỔNG QUAN QUÁN NHẬU VẬN HÀNH THỦ CÔNG TRƯỚC KHI LÊN HỆ THỐNG (1 POOL DUY NHẤT · 6 SWIMLANES)&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11.5px;color:#222222;'&gt;Mô hình hóa hiện trạng thủ công (Giấy order 2 liên, Chạy bộ hỏi bể cá, Xuất bia không phiếu, Cộng bill tay, Chụp ảnh bill chuyển khoản Zalo, Kiểm kho giấy) để làm nổi bật các điểm nghẽn &amp; thất thoát&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;align=left;spacingLeft=16;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="12" width="4100" height="52"/>
+        </mxCell>
+        <mxCell id="legend_3" value="&lt;b&gt;CHÚ GIẢI KÝ HIỆU BPMN 2.0 NÂNG CAO TRÊN SƠ ĐỒ:&lt;/b&gt; &amp;nbsp;&amp;nbsp;[Timer] &lt;b&gt;Timer Event&lt;/b&gt; (Đếm giờ / Định kỳ / Quá hạn) &amp;nbsp;|&amp;nbsp; [Link] &lt;b&gt;Link Event [Throw/Catch]&lt;/b&gt; (Nối chuyển tiếp gọn sơ đồ) &amp;nbsp;|&amp;nbsp; [Signal] &lt;b&gt;Signal Event&lt;/b&gt; (Phát/Nhận tín hiệu đồng bộ toàn hệ thống) &amp;nbsp;|&amp;nbsp; [Escalation] &lt;b&gt;Escalation Event&lt;/b&gt; (Leo thang từ Quản lý ca lên Chủ quán) &amp;nbsp;|&amp;nbsp; [Error] &lt;b&gt;Error Event&lt;/b&gt; (Bắt lỗi nghiệp vụ) &amp;nbsp;|&amp;nbsp; [Compensation] &lt;b&gt;Compensation&lt;/b&gt; (Bồi hoàn tồn bể cá / kho bia / KM) &amp;nbsp;|&amp;nbsp; [Conditional] &lt;b&gt;Conditional&lt;/b&gt; (Điều kiện tự động) &amp;nbsp;|&amp;nbsp; [Terminate] &lt;b&gt;Terminate End&lt;/b&gt; / [Cancel] &lt;b&gt;Cancel End&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f7fa;strokeColor=#6c8ebf;strokeWidth=1.5;align=left;spacingLeft=14;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="70" width="4100" height="34"/>
+        </mxCell>
+        <mxCell id="pool_4" value="POOL DUY NHẤT: QUY TRÌNH VẬN HÀNH QUÁN NHẬU THỦ CÔNG TRƯỚC KHI LÊN HỆ THỐNG (AS-IS MANUAL PROCESS)" style="swimlane;html=1;horizontal=0;startSize=38;whiteSpace=wrap;fillColor=#fbe9e7;strokeColor=#bf360c;strokeWidth=2.2;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="40" y="112" width="4100" height="1720"/>
+        </mxCell>
+        <mxCell id="lane_5" value="1. Khách Hàng (Gọi điện / Gọi món miệng / Chụp ảnh CK)" style="swimlane;html=1;horizontal=0;startSize=36;whiteSpace=wrap;fillColor=#fff3e0;strokeColor=#6c8ebf;strokeWidth=1.5;fontStyle=1;fontSize=11.5;swimlaneFillColor=#ffffff;" vertex="1" parent="pool_4">
+          <mxGeometry as="geometry" x="38" y="0" width="4062" height="230"/>
+        </mxCell>
+        <mxCell id="lane_6" value="2. Phục Vụ (Ghi giấy 2 liên / Chạy bộ xuống bếp &amp; bể cá)" style="swimlane;html=1;horizontal=0;startSize=36;whiteSpace=wrap;fillColor=#fff8e1;strokeColor=#6c8ebf;strokeWidth=1.5;fontStyle=1;fontSize=11.5;swimlaneFillColor=#ffffff;" vertex="1" parent="pool_4">
+          <mxGeometry as="geometry" x="38" y="230" width="4062" height="310"/>
+        </mxCell>
+        <mxCell id="lane_7" value="3. Tiếp Thị Bia PG (Tự bê thùng bia / Đếm vỏ thủ công)" style="swimlane;html=1;horizontal=0;startSize=36;whiteSpace=wrap;fillColor=#f9fbe7;strokeColor=#6c8ebf;strokeWidth=1.5;fontStyle=1;fontSize=11.5;swimlaneFillColor=#ffffff;" vertex="1" parent="pool_4">
+          <mxGeometry as="geometry" x="38" y="540" width="4062" height="250"/>
+        </mxCell>
+        <mxCell id="lane_8" value="4. Bếp &amp; Hồ Cá (Nhìn giấy viết tay / Cân cá ghi mảnh giấy)" style="swimlane;html=1;horizontal=0;startSize=36;whiteSpace=wrap;fillColor=#e8f5e9;strokeColor=#6c8ebf;strokeWidth=1.5;fontStyle=1;fontSize=11.5;swimlaneFillColor=#ffffff;" vertex="1" parent="pool_4">
+          <mxGeometry as="geometry" x="38" y="790" width="4062" height="300"/>
+        </mxCell>
+        <mxCell id="lane_9" value="5. Thu Ngân / Quản Lý (Ghi sổ đặt bàn / Cộng bill máy tính)" style="swimlane;html=1;horizontal=0;startSize=36;whiteSpace=wrap;fillColor=#f3e5f5;strokeColor=#6c8ebf;strokeWidth=1.5;fontStyle=1;fontSize=11.5;swimlaneFillColor=#ffffff;" vertex="1" parent="pool_4">
+          <mxGeometry as="geometry" x="38" y="1090" width="4062" height="340"/>
+        </mxCell>
+        <mxCell id="lane_10" value="6. Chủ Quán &amp; Kế Toán (Duyệt miệng / Nhập lại Excel cuối tháng)" style="swimlane;html=1;horizontal=0;startSize=36;whiteSpace=wrap;fillColor=#ffebee;strokeColor=#6c8ebf;strokeWidth=1.5;fontStyle=1;fontSize=11.5;swimlaneFillColor=#ffffff;" vertex="1" parent="pool_4">
+          <mxGeometry as="geometry" x="38" y="1430" width="4062" height="290"/>
+        </mxCell>
+        <mxCell id="evt_11" value="08:00 Mở ca sáng
+[Timer Start]" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=standard;symbol=timer;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;fontStyle=1;" vertex="1" parent="lane_8">
+          <mxGeometry as="geometry" x="55" y="95" width="40" height="40"/>
+        </mxCell>
+        <mxCell id="task_12" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Cân tổng số kg cá sống đổ chung vào bể &amp; Ghi sổ tay nhập nguyên liệu bếp (Không gắn mã từng con cá)&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_8">
+          <mxGeometry as="geometry" x="145" y="80" width="230" height="72"/>
+        </mxCell>
+        <mxCell id="pain_13" value="&lt;b style='font-size:9px;color:#b71c1c;'&gt;[ĐIỂM NGHẼN / RỦI RO AS-IS] Không quản lý từng con cá&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:9.5px;color:#333333;'&gt;Chỉ biết tổng kg đầu ngày; cá chết hoặc bị tráo con nhỏ không phát hiện được&lt;/span&gt;" style="shape=note;whiteSpace=wrap;html=1;size=12;verticalAlign=middle;align=center;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=1.5;dashed=1;fontSize=9.5;" vertex="1" parent="lane_8">
+          <mxGeometry as="geometry" x="145" y="170" width="230" height="58"/>
+        </mxCell>
+        <mxCell id="task_14" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Khách gọi điện / nhắn Zalo đặt bàn trước &amp; Chuyển khoản cọc vào TK cá nhân&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_5">
+          <mxGeometry as="geometry" x="420" y="75" width="215" height="68"/>
+        </mxCell>
+        <mxCell id="task_15" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Thu ngân ghi lịch đặt bàn vào Sổ tay / Giấy dán tường &amp; Tự nhớ giờ hẹn của khách&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="420" y="90" width="220" height="70"/>
+        </mxCell>
+        <mxCell id="evt_16" value="Quá 30p quên kiểm tra
+[Timer Boundary]" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=boundNonint;symbol=timer;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;fontStyle=1;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="580" y="145" width="34" height="34"/>
+        </mxCell>
+        <mxCell id="pain_17" value="&lt;b style='font-size:9px;color:#b71c1c;'&gt;[ĐIỂM NGHẼN / RỦI RO AS-IS] Giữ bàn ảo / Trùng bàn VIP&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:9.5px;color:#333333;'&gt;Không tự động nhả bàn khi khách bùng cọc; dễ xếp trùng 2 đoàn vào cùng 1 phòng VIP&lt;/span&gt;" style="shape=note;whiteSpace=wrap;html=1;size=12;verticalAlign=middle;align=center;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=1.5;dashed=1;fontSize=9.5;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="420" y="215" width="230" height="58"/>
+        </mxCell>
+        <mxCell id="evt_18" value="LINK A
+(Ghi Order giấy)" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=catching;symbol=link;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;fontStyle=1;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="700" y="15" width="40" height="40"/>
+        </mxCell>
+        <mxCell id="gw_19" value="Vào lượt ghi giấy" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=rhombusPerimeter;background=gateway;outline=none;symbol=exclusiveGw;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="698" y="99" width="44" height="44"/>
+        </mxCell>
+        <mxCell id="task_20" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Đón khách vào bàn (Không phân công rõ ai đứng bàn nào) -&gt; Ghi món khách gọi ra Giấy Order 2 liên&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="775" y="85" width="225" height="72"/>
+        </mxCell>
+        <mxCell id="paper_21" value="&lt;b style='font-size:9px;color:#6d4c41;'&gt;[GIẤY TỜ / SỔ TAY THỦ CÔNG]&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:9.5px;'&gt;Giấy Order Viết Tay 2 Liên&lt;br/&gt;[Chữ viết vội, không biết tồn kho]&lt;/span&gt;" style="shape=note;whiteSpace=wrap;html=1;size=12;verticalAlign=middle;align=center;fillColor=#efebe9;strokeColor=#6d4c41;strokeWidth=1.3;fontSize=9.5;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="790" y="180" width="200" height="50"/>
+        </mxCell>
+        <mxCell id="gw_22" value="Chia việc thủ công (OR)" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=rhombusPerimeter;background=gateway;outline=none;symbol=inclusiveGw;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=1;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="1045" y="99" width="44" height="44"/>
+        </mxCell>
+        <mxCell id="task_23" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Chạy bộ xuống hồ cá hỏi Phụ bể còn cá gì -&gt; Dẫn khách xuống xem hoặc báo miệng lại cho bàn&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="1135" y="20" width="225" height="70"/>
+        </mxCell>
+        <mxCell id="task_24" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Vớt cá cân thủ công (Hoặc chặt ước chừng 500g không theo dõi con cá đang xẻ) -&gt; Ghi số kg lên mảnh giấy ướt&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_8">
+          <mxGeometry as="geometry" x="1135" y="80" width="235" height="72"/>
+        </mxCell>
+        <mxCell id="evt_25" value="Khách ép giá cá nguyên con
+[Escalation]" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=boundNonint;symbol=escalation;fillColor=#fff3e0;strokeColor=#ef6c00;fontSize=10;fontStyle=1;" vertex="1" parent="lane_8">
+          <mxGeometry as="geometry" x="1310" y="135" width="34" height="34"/>
+        </mxCell>
+        <mxCell id="task_26" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Phục vụ chạy đi tìm hoặc gọi điện hỏi miệng Chủ quán có bán giá khách trả hay không (Mất 5-10 phút)&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_10">
+          <mxGeometry as="geometry" x="1135" y="85" width="235" height="72"/>
+        </mxCell>
+        <mxCell id="task_27" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Cầm liên giấy đỏ chạy xuống Bếp kẹp lên dây -&gt; Đầu bếp đọc giấy viết tay để nấu&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="1420" y="85" width="220" height="72"/>
+        </mxCell>
+        <mxCell id="evt_28" value="Nguyên liệu đã hết/hỏng!
+[Error Boundary]" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=boundInt;symbol=error;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="lane_8">
+          <mxGeometry as="geometry" x="1580" y="65" width="34" height="34"/>
+        </mxCell>
+        <mxCell id="task_29" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Phục vụ phải chạy ngược ra bàn báo hết món &amp; Xin lỗi khách để chọn lại món khác&lt;/b&gt;&lt;br/&gt;&lt;b style='font-size:10px;color:#d79b00;'&gt;[ &amp;lt;&amp;lt; ] Bồi hoàn (Compensation)&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;isLoopComp=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="1420" y="200" width="220" height="66"/>
+        </mxCell>
+        <mxCell id="task_30" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;PG Bia tự lấy Nguyên thùng bia (24 lon) đem ra bàn (Không bấm máy, chỉ gạch phấn hoặc nhớ miệng)&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_7">
+          <mxGeometry as="geometry" x="1420" y="75" width="230" height="72"/>
+        </mxCell>
+        <mxCell id="pain_31" value="&lt;b style='font-size:9px;color:#b71c1c;'&gt;[ĐIỂM NGHẼN / RỦI RO AS-IS] Quên ghi bill / Lẫn bia KM&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:9.5px;color:#333333;'&gt;Đem 2-3 thùng ra bàn giờ cao điểm dễ quên ghi sổ Thu ngân; nhập nhèm vỏ/nắp lon tặng&lt;/span&gt;" style="shape=note;whiteSpace=wrap;html=1;size=12;verticalAlign=middle;align=center;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=1.5;dashed=1;fontSize=9.5;" vertex="1" parent="lane_7">
+          <mxGeometry as="geometry" x="1685" y="75" width="220" height="58"/>
+        </mxCell>
+        <mxCell id="gw_32" value="Lên món tại bàn (OR)" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=rhombusPerimeter;background=gateway;outline=none;symbol=inclusiveGw;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;fontStyle=1;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="1910" y="99" width="44" height="44"/>
+        </mxCell>
+        <mxCell id="task_33" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Bưng món ra bàn (Thường xuyên nhầm bàn hoặc sót món do giấy order rơi/ướt nước)&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="1985" y="85" width="205" height="70"/>
+        </mxCell>
+        <mxCell id="gw_34" value="Khách gọi thêm?" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=rhombusPerimeter;background=gateway;outline=none;symbol=exclusiveGw;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="2220" y="99" width="44" height="44"/>
+        </mxCell>
+        <mxCell id="evt_35" value="LINK A
+(Ghi Order giấy)" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=throwing;symbol=link;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;fontStyle=1;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="2222" y="15" width="40" height="40"/>
+        </mxCell>
+        <mxCell id="task_36" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Khách gọi tính tiền &amp; Trả lại các lon bia chưa khui còn dư trong thùng trên bàn&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_5">
+          <mxGeometry as="geometry" x="2300" y="75" width="215" height="68"/>
+        </mxCell>
+        <mxCell id="task_37" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Phục vụ đếm vỏ bia dưới gầm bàn / Đếm số lon trả lại -&gt; Báo miệng cho Thu ngân gạch sửa trên tờ phơi giấy&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="2300" y="85" width="230" height="72"/>
+        </mxCell>
+        <mxCell id="task_38" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Thu ngân gom các mảnh giấy order + mảnh giấy cân cá -&gt; Bấm máy tính cầm tay cộng tiền &amp; Viết/In tạm tính&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="2580" y="90" width="235" height="74"/>
+        </mxCell>
+        <mxCell id="evt_39" value="Cộng sót món / Quên trừ cọc
+[Error Boundary]" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=boundInt;symbol=error;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="2755" y="148" width="34" height="34"/>
+        </mxCell>
+        <mxCell id="pain_40" value="&lt;b style='font-size:9px;color:#b71c1c;'&gt;[ĐIỂM NGHẼN / RỦI RO AS-IS] Không khóa Bill sau tạm tính&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:9.5px;color:#333333;'&gt;Nhân viên có thể tự gạch bỏ món hoặc sửa giảm số lon bia sau khi khách đã trả tiền mặt&lt;/span&gt;" style="shape=note;whiteSpace=wrap;html=1;size=12;verticalAlign=middle;align=center;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=1.5;dashed=1;fontSize=9.5;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="2580" y="215" width="235" height="58"/>
+        </mxCell>
+        <mxCell id="task_41" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Khách quét mã QR tĩnh của quán (Nội dung CK tự gõ tùy ý, không có mã định danh bàn)&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_5">
+          <mxGeometry as="geometry" x="2875" y="75" width="225" height="68"/>
+        </mxCell>
+        <mxCell id="task_42" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Phục vụ lấy ĐT chụp lại màn hình chuyển khoản của khách -&gt; Gửi vào nhóm Zalo quán hỏi 'Tiền vào chưa?'&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_6">
+          <mxGeometry as="geometry" x="2875" y="85" width="235" height="72"/>
+        </mxCell>
+        <mxCell id="evt_43" value="Chờ 3-10 phút dò sao kê
+[Timer Catch]" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=catching;symbol=timer;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;fontStyle=1;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="3155" y="105" width="40" height="40"/>
+        </mxCell>
+        <mxCell id="task_44" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Thu ngân/Chủ quán mở App Ngân hàng dò bằng mắt từng giao dịch (Tiền Tip khách chuyển dư bị trộn lẫn vào doanh thu)&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="3235" y="90" width="245" height="74"/>
+        </mxCell>
+        <mxCell id="pain_45" value="&lt;b style='font-size:9px;color:#b71c1c;'&gt;[ĐIỂM NGHẼN / RỦI RO AS-IS] Nghẽn cổ chai &amp; Không tách được Tip&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:9.5px;color:#333333;'&gt;Giờ cao điểm 10 bàn chuyển khoản cùng lúc gây ùn tắc; không biết tiền của bàn nào và không chia Tip tự động được&lt;/span&gt;" style="shape=note;whiteSpace=wrap;html=1;size=12;verticalAlign=middle;align=center;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=1.5;dashed=1;fontSize=9.5;" vertex="1" parent="lane_9">
+          <mxGeometry as="geometry" x="3235" y="215" width="245" height="60"/>
+        </mxCell>
+        <mxCell id="evt_46" value="23:30 Đóng cửa
+[Timer]" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=catching;symbol=timer;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;" vertex="1" parent="lane_8">
+          <mxGeometry as="geometry" x="3535" y="95" width="40" height="40"/>
+        </mxCell>
+        <mxCell id="task_47" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Đếm tồn thực tế cuối ca ghi ra sổ giấy (Không đối soát được Đầu ca + Nhập - Bán - Hỏng)&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_8">
+          <mxGeometry as="geometry" x="3615" y="80" width="225" height="72"/>
+        </mxCell>
+        <mxCell id="task_48" value="&lt;span style='font-size:9.5px;color:#444444;'&gt;[Manual Task]&lt;/span&gt;&lt;br/&gt;&lt;b style='font-size:10.5px;'&gt;Kế toán/Chủ quán gom xấp bill giấy nhập lại vào Excel để tính Lãi lỗ, Thuế VAT &amp; Chia lương/Tip thủ công&lt;/b&gt;" style="shape=mxgraph.bpmn.task;html=1;whiteSpace=wrap;rectStyle=rounded;size=10;taskMarker=manual;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="lane_10">
+          <mxGeometry as="geometry" x="3615" y="85" width="235" height="74"/>
+        </mxCell>
+        <mxCell id="evt_49" value="Kết thúc ca thủ công
+(Nhiều sai lệch &amp; trễ hạn)" style="shape=mxgraph.bpmn.shape;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;outline=end;symbol=terminate;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;fontStyle=1;" vertex="1" parent="lane_10">
+          <mxGeometry as="geometry" x="3910" y="102" width="40" height="40"/>
+        </mxCell>
+        <mxCell id="flow_50" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="evt_11" target="task_12">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_51" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;dashPattern=2 3;endArrow=open;endFill=0;strokeWidth=1.2;strokeColor=#555555;labelBackgroundColor=#ffffff;fontSize=9;" edge="1" parent="1" source="task_12" target="pain_13">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_52" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_12" target="task_14">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_53" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_14" target="task_15">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_54" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;dashPattern=2 3;endArrow=open;endFill=0;strokeWidth=1.2;strokeColor=#555555;labelBackgroundColor=#ffffff;fontSize=9;" edge="1" parent="1" source="task_15" target="pain_17">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_55" value="Quên xóa bàn giữ chỗ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="evt_16" target="gw_19">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_56" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_15" target="gw_19">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_57" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="evt_18" target="gw_19">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_58" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="gw_19" target="task_20">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_59" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;dashPattern=2 3;endArrow=open;endFill=0;strokeWidth=1.2;strokeColor=#555555;labelBackgroundColor=#ffffff;fontSize=9;" edge="1" parent="1" source="task_20" target="paper_21">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_60" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_20" target="gw_22">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_61" value="Khách hỏi Hải sản" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="gw_22" target="task_23">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_62" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_23" target="task_24">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_63" value="Chạy xin giá Chủ quán" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="evt_25" target="task_26">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_64" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_26" target="task_27">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_65" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_24" target="task_27">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_66" value="Món bếp" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="gw_22" target="task_27">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_67" value="Báo hết nguyên liệu muộn" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="evt_28" target="task_29">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_68" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.3;entryY=1;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_29" target="gw_32">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_69" value="Gọi Bia thùng" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="gw_22" target="task_30">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_70" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;dashPattern=2 3;endArrow=open;endFill=0;strokeWidth=1.2;strokeColor=#555555;labelBackgroundColor=#ffffff;fontSize=9;" edge="1" parent="1" source="task_30" target="pain_31">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_71" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_30" target="gw_32">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_72" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_27" target="gw_32">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_73" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="gw_32" target="task_33">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_74" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_33" target="gw_34">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_75" value="Gọi thêm món" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;startArrow=diamondThin;startFill=0;startSize=10;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#b85450;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;fontColor=#b85450;" edge="1" parent="1" source="gw_34" target="evt_35">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_76" value="Gọi tính tiền (Default)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=dash;startFill=0;startSize=8;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#1b5e20;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;fontColor=#1b5e20;" edge="1" parent="1" source="gw_34" target="task_36">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_77" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_36" target="task_37">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_78" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_37" target="task_38">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_79" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;dashPattern=2 3;endArrow=open;endFill=0;strokeWidth=1.2;strokeColor=#555555;labelBackgroundColor=#ffffff;fontSize=9;" edge="1" parent="1" source="task_38" target="pain_40">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_80" value="Bill cộng sai tiền" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="evt_39" target="task_41">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_81" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_38" target="task_41">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_82" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_41" target="task_42">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_83" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_42" target="evt_43">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_84" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="evt_43" target="task_44">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_85" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;dashed=1;dashPattern=2 3;endArrow=open;endFill=0;strokeWidth=1.2;strokeColor=#555555;labelBackgroundColor=#ffffff;fontSize=9;" edge="1" parent="1" source="task_44" target="pain_45">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_86" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_44" target="evt_46">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_87" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="evt_46" target="task_47">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_88" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_47" target="task_48">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+        <mxCell id="flow_89" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;endArrow=block;endFill=1;strokeWidth=1.6;strokeColor=#222222;labelBackgroundColor=#ffffff;fontSize=9.5;fontStyle=1;" edge="1" parent="1" source="task_48" target="evt_49">
+          <mxGeometry as="geometry" relative="1"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

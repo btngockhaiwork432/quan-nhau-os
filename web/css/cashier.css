@@ -1,0 +1,135 @@
+/* =========================================================================
+   POS Thu Ngan & Quan Ly Ca (cashier.js)
+   ========================================================================= */
+.pos-tb-title { font-size: 20px; font-weight: 700; }
+.pos-bill-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.pos-open-form { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.pos-empty-pane { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+
+.pos-vip-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.pos-vip-card {
+  padding: 10px 12px; border-radius: var(--radius);
+  border: 1px solid var(--violet-100); background: var(--violet-50);
+  text-align: left; display: flex; flex-direction: column; gap: 4px;
+}
+.pos-vip-card.active { outline: 2px solid var(--violet); }
+.pos-bk-alert { border-color: var(--info-100); background: var(--info-50); }
+.pos-bk-card:hover { border-color: var(--border-strong); }
+
+.px-12 { padding-left: 12px; padding-right: 12px; }
+.px-16 { padding-left: 16px; padding-right: 16px; }
+.ml-8 { margin-left: 8px; }
+
+/* Bill lines & totals inside POS */
+.bill-line {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.bill-line:last-child { border-bottom: 0; }
+.bill-line .bl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bill-line .bl-name { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bill-line .bl-meta { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bill-line .bl-qty { min-width: 54px; text-align: right; font-weight: 600; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bill-line .bl-amt { min-width: 88px; text-align: right; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bill-line.is-void .bl-name,
+.bill-line.is-void .bl-amt { text-decoration: line-through; color: var(--text-4); }
+
+.bill-totals { display: flex; flex-direction: column; gap: 5px; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+.bill-totals .tot-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: var(--text-2); }
+.bill-totals .tot-row.tot-grand {
+  font-size: 20px; font-weight: 700; color: var(--text);
+  padding-top: 8px; margin-top: 4px; border-top: 1px dashed var(--border-strong);
+}
+
+/* Mobile / Tablet Switcher for POS Thu Ngan */
+.pos-mobile-switch {
+  display: none;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  gap: 8px;
+  position: sticky;
+  top: calc(var(--demo-h) + 56px);
+  z-index: 25;
+}
+.pos-mobile-switch .pms-btn {
+  flex: 1;
+  height: 40px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-weight: 600;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  min-width: 0;
+}
+.pos-mobile-switch .pms-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pos-mobile-switch .pms-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+@media (max-width: 1080px) {
+  .pos {
+    height: auto;
+    min-height: calc(100vh - var(--demo-h));
+    overflow-x: hidden;
+  }
+  .pos-mobile-switch {
+    display: flex;
+  }
+  .pos-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pos-body[data-mobile-pane="floor"] .pos-right {
+    display: none;
+  }
+  .pos-body[data-mobile-pane="bill"] .pos-left {
+    display: none;
+  }
+  .pos-left {
+    border-right: 0;
+  }
+  .pos-left-body,
+  .pos-bill-lines {
+    overflow-y: visible;
+    max-height: none;
+  }
+  .kbd-hints {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .pos-left-head,
+  .pos-left-body,
+  .pos-bill-head,
+  .pos-bill-lines,
+  .pos-bill-foot {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .pos-actions {
+    grid-template-columns: 1fr;
+  }
+  .pos-actions .span-2 {
+    grid-column: auto;
+  }
+  .denoms {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .bill-line {
+    flex-wrap: wrap;
+  }
+}

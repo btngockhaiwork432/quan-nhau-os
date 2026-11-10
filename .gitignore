@@ -1,0 +1,15 @@
+# Local embedded PostgreSQL data & logs
+backend/pgdata/
+backend/postgres.log
+backend/.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db
