@@ -11,7 +11,10 @@ Cung cap:
 import asyncio
 import json
 import os
+import re
+import threading
 import time
+import urllib.request
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
@@ -30,6 +33,7 @@ WEB_DIR = BACKEND_DIR.parent / "web"
 # Danh sach hang doi SSE cho cac thiet bi dang ket noi
 _sse_Subscribers: Set[asyncio.Queue] = set()
 _main_loop: Optional[asyncio.AbstractEventLoop] = None
+_state_write_lock = threading.Lock()
 
 
 def broadcast_event(event_type: str, payload: Dict[str, Any]) -> None:
@@ -81,6 +85,7 @@ class StateCommitPayload(BaseModel):
     who: Optional[str] = "system"
     auditText: Optional[str] = None
     clientId: Optional[str] = None
+    baseRevision: Optional[int] = None
 
 
 class SeedPayload(BaseModel):
@@ -114,7 +119,14 @@ def api_db_overview():
 
 
 @app.post("/api/db/query")
-def api_db_query(payload: SqlQueryPayload):
+def api_db_query(payload: SqlQueryPayload, request: Request):
+    staff_id = request.headers.get("x-staff-id", "")
+    staff_pin = request.headers.get("x-staff-pin", "")
+    if not db.verify_admin_staff(staff_id, staff_pin):
+        raise HTTPException(
+            status_code=403,
+            detail="Chỉ Chủ quán hoặc Kế toán đã đăng nhập mới có quyền chạy truy vấn SQL trực tiếp.",
+        )
     try:
         rows = db.execute_readonly_sql(payload.query)
         return {"ok": True, "count": len(rows), "rows": rows}
@@ -140,15 +152,16 @@ def api_get_state():
 
 @app.post("/api/state/seed")
 def api_seed_state(payload: SeedPayload):
-    if db.is_seeded() and not payload.force:
-        st = db.load_state_from_postgres()
-        return {"ok": True, "seeded": False, "revision": st["revision"] if st else 0, "state": st}
+    with _state_write_lock:
+        if db.is_seeded() and not payload.force:
+            st = db.load_state_from_postgres()
+            return {"ok": True, "seeded": False, "revision": st["revision"] if st else 0, "state": st}
 
-    rev = db.persist_state_to_postgres(
-        payload.state,
-        who=payload.who or "system",
-        audit_text="Khởi tạo / Khôi phục dữ liệu mẫu trên PostgreSQL" if payload.force else "Khởi tạo dữ liệu gốc trên PostgreSQL",
-    )
+        rev = db.persist_state_to_postgres(
+            payload.state,
+            who=payload.who or "system",
+            audit_text="Khởi tạo / Khôi phục dữ liệu mẫu trên PostgreSQL" if payload.force else "Khởi tạo dữ liệu gốc trên PostgreSQL",
+        )
     broadcast_event(
         "state_updated",
         {
@@ -164,11 +177,25 @@ def api_seed_state(payload: SeedPayload):
 
 @app.put("/api/state")
 def api_put_state(payload: StateCommitPayload):
-    rev = db.persist_state_to_postgres(
-        payload.state,
-        who=payload.who or "system",
-        audit_text=payload.auditText,
-    )
+    with _state_write_lock:
+        if payload.baseRevision is not None:
+            cur_rev = db.get_revision()
+            if cur_rev > payload.baseRevision:
+                latest = db.load_state_from_postgres()
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "ok": False,
+                        "conflict": True,
+                        "revision": cur_rev,
+                        "state": latest,
+                    },
+                )
+        rev = db.persist_state_to_postgres(
+            payload.state,
+            who=payload.who or "system",
+            audit_text=payload.auditText,
+        )
     broadcast_event(
         "state_updated",
         {
@@ -326,7 +353,9 @@ def api_get_inventory():
 
 @app.get("/api/staff")
 def api_list_staff(day_key: Optional[str] = None):
-    staff = db.execute_readonly_sql("SELECT * FROM staff ORDER BY id ASC")
+    staff = db.execute_readonly_sql(
+        "SELECT id, name, role, phone, pay_type, base_salary, hourly_rate, shift_id, brand_ids_json, assigned_areas_json, assigned_tables_json, active FROM staff ORDER BY id ASC"
+    )
     if day_key:
         att = db.execute_readonly_sql(
             "SELECT * FROM attendance WHERE day_key = %s ORDER BY check_in ASC",
@@ -439,6 +468,11 @@ def api_list_payment_webhooks(limit: int = Query(50, ge=1, le=200)):
 
 @app.post("/api/webhooks/payment")
 def api_receive_payment_webhook(payload: PaymentWebhookPayload, request: Request):
+    with _state_write_lock:
+        return _process_payment_webhook_locked(payload, request)
+
+
+def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Request):
     """
     Endpoint nhan Webhook bien dong so du tu cong thanh toan (SePay, Casso, PayOS, VietQR).
     Dinh danh hoa don qua ma noi dung chuyen khoan (payCode, VD: 'QN A02 1234').
@@ -940,10 +974,60 @@ def api_receive_payment_webhook(payload: PaymentWebhookPayload, request: Request
 
 # Phuc vu cac duong dan SPA sach (khong can dau #): /login, /customer, /waiter, /pg, /kiosk, /cashier, /owner
 _SPA_PORTALS = ("login", "customer", "waiter", "pg", "kiosk", "cashier", "owner")
+_tax_lookup_cache: Dict[str, Dict[str, str]] = {}
+
+
+@app.get("/api/tax-lookup/{tax_code}")
+def api_lookup_tax_code(tax_code: str):
+    code = re.sub(r"[\s\-]", "", str(tax_code or ""))
+    if not re.match(r"^\d{10}(\d{3})?$", code):
+        return {"ok": False, "error": "Mã số thuế không hợp lệ."}
+    # 1. Uu tien khach doanh nghiep da tung xuat hoa don tai quan
+    try:
+        rows = db.execute_readonly_sql(
+            "SELECT company, address, email FROM einvoices WHERE tax_code = %s ORDER BY issued_at DESC LIMIT 1",
+            (code,),
+        )
+        if rows and rows[0].get("company"):
+            return {
+                "ok": True,
+                "name": rows[0]["company"],
+                "address": rows[0].get("address") or "",
+                "email": rows[0].get("email") or "",
+                "source": "history",
+            }
+    except Exception:
+        pass
+    # 2. Bo nho dem & cong tra cuu doanh nghiep VietQR
+    if code in _tax_lookup_cache:
+        return {"ok": True, **_tax_lookup_cache[code], "source": "cache"}
+    try:
+        req = urllib.request.Request(
+            f"https://api.vietqr.io/v2/business/{code}",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            data = body.get("data") or {}
+            if body.get("code") == "00" and data.get("name"):
+                entry = {"name": str(data["name"]).strip(), "address": str(data.get("address") or "").strip()}
+                _tax_lookup_cache[code] = entry
+                return {"ok": True, **entry, "source": "vietqr"}
+    except Exception:
+        pass
+    return {"ok": False}
 
 
 def _serve_spa_index():
-    return FileResponse(str(WEB_DIR / "index.html"))
+    return FileResponse(
+        str(WEB_DIR / "index.html"),
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/", include_in_schema=False)
+def _serve_root_index():
+    return _serve_spa_index()
 
 
 for _p in _SPA_PORTALS:

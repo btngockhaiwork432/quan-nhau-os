@@ -12,7 +12,7 @@
       mode: "new",
       bk: { step: 0, day: null, time: null, guests: 4, area: null, name: "", phone: "", note: "", tried: false, bookingId: null },
       lk: { phone: "", searched: "" },
-      bt: { phone: "", otp: "", code: "", target: "", verified: "" },
+      bt: { phone: "", cardCode: "", otp: "", code: "", target: "", verified: "" },
       inv: { code: "", saleId: null, taxCode: "", company: "", address: "", email: "", tried: false, resultId: null },
     });
   const C = () => Store.config;
@@ -411,14 +411,23 @@
   function bottleTab() {
     const b = S().bt;
     if (b.verified) return bottleList(b.verified);
+    if (!App.isDemo()) {
+      return '<div class="card card-pad cu-otp">' +
+        '<div class="cu-step-ic">' + I("wine", "ic-xl") + "</div>" +
+        "<h3>Tra cứu rượu đang gửi</h3>" +
+        '<p class="muted">Nhập số điện thoại và mã thẻ gửi rượu (được in trên phiếu gửi rượu giao tại quầy) để bảo mật thông tin của bạn.</p>' +
+        UI.field("Số điện thoại gửi rượu", UI.input({ id: "cu-bt-phone", model: "customer.bt.phone", value: b.phone, placeholder: "VD: 0912 345 678", inputmode: "tel", maxlength: 13, cls: "input-lg" }), { for: "cu-bt-phone" }) +
+        UI.field("Mã thẻ gửi rượu", UI.input({ id: "cu-bt-card", model: "customer.bt.cardCode", value: b.cardCode || "", placeholder: "VD: RG-0017", maxlength: 12, cls: "input-lg cu-code-input" }), { for: "cu-bt-card", help: "Nhập mã RG-XXXX in trên thẻ dán chai rượu." }) +
+        UI.btn("Tra cứu rượu gửi", { act: "customer.btVerifyCard", kind: "primary", size: "lg", block: true, icon: "search" }) +
+        '<div class="small muted center">Quên mã thẻ gửi rượu? Vui lòng gọi ' + esc(C().store.phone) + " hoặc đọc số điện thoại cho nhân viên tại quầy để kiểm tra trực tiếp.</div>" +
+        "</div>";
+    }
     if (b.code) {
       return '<div class="card card-pad cu-otp">' +
         '<div class="cu-step-ic">' + I("shield-check", "ic-xl") + "</div>" +
         "<h3>Nhập mã xác thực</h3>" +
         '<p class="muted">Mã gồm 6 chữ số vừa được gửi qua tin nhắn tới số <b>' + esc(fmtPhone(b.target)) + "</b>.</p>" +
-        (App.isDemo()
-          ? UI.banner("info", "layers", "<b>Bản demo:</b> Mã OTP demo: <b class=\"cu-mono\">" + esc(b.code) + "</b>")
-          : UI.banner("info", "shield-check", "Mã xác thực hiệu lực trong 5 phút: <b class=\"cu-mono\">" + esc(b.code) + "</b>")) +
+        UI.banner("info", "layers", "<b>Bản demo:</b> Mã OTP demo: <b class=\"cu-mono\">" + esc(b.code) + "</b>") +
         UI.input({ id: "cu-otp", model: "customer.bt.otp", value: b.otp, placeholder: "------", inputmode: "numeric", maxlength: 6, cls: "input-lg cu-otp-input", autofocus: true }) +
         UI.btn("Xác nhận và xem rượu gửi", { act: "customer.otpVerify", kind: "primary", size: "lg", block: true, icon: "check" }) +
         '<div class="row between"><button type="button" class="cu-link" data-act="customer.otpChange">' + I("chevron-left", "ic-sm") + 'Đổi số điện thoại</button><button type="button" class="cu-link" data-act="customer.otpSend">' + I("refresh-cw", "ic-sm") + "Gửi lại mã</button></div>" +
@@ -509,6 +518,10 @@
       '<div class="card-foot" style="justify-content:flex-start">' + UI.btn("Tra cứu hóa đơn khác", { act: "customer.invBack", kind: "ghost", size: "sm", icon: "chevron-left" }) + "</div>" +
       "</div>";
     if (issued || sale.einvoice) {
+      const isReq = (issued && issued.status === "requested") || (sale.einvoice && sale.einvoice.status === "requested");
+      if (isReq) {
+        return bill + '<div class="card card-pad">' + UI.banner("info", "clock", "<b>Đã tiếp nhận yêu cầu xuất hóa đơn</b> mã <b>" + esc(sale.einvoice.invoiceNo) + "</b> lúc " + U.time(sale.einvoice.at) + " " + U.date(sale.einvoice.at) + (issued ? " cho " + esc(issued.company) + " (MST " + esc(issued.taxCode) + "). Bộ phận Kế toán sẽ phát hành và gửi hóa đơn tới <b>" + esc(issued.email) + "</b> trong 24 giờ làm việc" : "") + ". Cần điều chỉnh thông tin, vui lòng gọi " + esc(C().store.phone) + ".") + "</div>";
+      }
       return bill + '<div class="card card-pad">' + UI.banner("success", "file-check", "<b>Hóa đơn này đã được xuất</b> số " + esc(sale.einvoice.invoiceNo) + " lúc " + U.time(sale.einvoice.at) + " " + U.date(sale.einvoice.at) + (issued ? " cho " + esc(issued.company) + " (MST " + esc(issued.taxCode) + "), đã gửi tới " + esc(issued.email) : "") + ". Mỗi hóa đơn chỉ xuất được một lần. Cần điều chỉnh, vui lòng liên hệ quán.") + "</div>";
     }
     if (expired) {
@@ -535,20 +548,23 @@
   }
 
   function invoiceDone(ei) {
+    const isReq = ei.status === "requested";
     return '<div class="card card-pad cu-done">' +
       '<div class="cu-done-ic">' + I("file-check", "ic-2xl") + "</div>" +
-      "<h3>Đã phát hành hóa đơn điện tử</h3>" +
-      '<p class="muted">Yêu cầu của bạn đã được xử lý thành công.</p>' +
-      '<div class="cu-code"><span>Số hóa đơn</span><b class="cu-mono">' + esc(ei.invoiceNo) + "</b>" + UI.badge("Đã phát hành", "success", true) + "</div>" +
+      "<h3>" + (isReq ? "Đã tiếp nhận yêu cầu xuất hóa đơn GTGT" : "Đã phát hành hóa đơn điện tử") + "</h3>" +
+      '<p class="muted">' + (isReq ? "Thông tin xuất hóa đơn đã được chuyển tới bộ phận Kế toán của quán." : "Yêu cầu của bạn đã được xử lý thành công.") + "</p>" +
+      '<div class="cu-code"><span>' + (isReq ? "Mã tiếp nhận" : "Số hóa đơn") + '</span><b class="cu-mono">' + esc(ei.invoiceNo) + "</b>" + UI.badge(isReq ? "Chờ kế toán phát hành" : "Đã phát hành", isReq ? "info" : "success", true) + "</div>" +
       '<div class="cu-done-body">' + dl([
         ["Đơn vị mua hàng", esc(ei.company)],
         ["Mã số thuế", '<span class="cu-mono">' + esc(ei.taxCode) + "</span>"],
         ei.address ? ["Địa chỉ", esc(ei.address)] : null,
         ["Tổng tiền thanh toán", U.money(ei.amount), "cu-strong-amt"],
-        ["Thời gian phát hành", U.time(ei.at) + " · " + U.date(ei.at)],
+        ["Thời gian ghi nhận", U.time(ei.at) + " · " + U.date(ei.at)],
       ]) +
-      '<div class="mt-12">' + UI.banner("success", "mail", "Hóa đơn điện tử (tệp PDF và XML) đã được gửi tới <b>" + esc(ei.email) + "</b>. Nếu không thấy, vui lòng kiểm tra cả hộp thư rác.") + "</div></div>" +
-      '<div class="cu-done-actions">' + UI.btn("Xuất hóa đơn khác", { act: "customer.invReset", icon: "plus", size: "lg" }) + "</div></div>";
+      '<div class="mt-12">' + UI.banner(isReq ? "info" : "success", "mail", isReq
+        ? "Hóa đơn điện tử (" + esc(C().tax.einvoiceProvider) + " — tệp PDF và XML) sẽ được kế toán kiểm tra, phát hành và gửi tới <b>" + esc(ei.email) + "</b> trong vòng 24 giờ làm việc."
+        : "Hóa đơn điện tử (tệp PDF và XML) đã được gửi tới <b>" + esc(ei.email) + "</b>. Nếu không thấy, vui lòng kiểm tra cả hộp thư rác.") + "</div></div>" +
+      '<div class="cu-done-actions">' + UI.btn("Tra cứu hóa đơn khác", { act: "customer.invReset", icon: "plus", size: "lg" }) + "</div></div>";
   }
 
   /* ======================= DANG KY GIAO DIEN ======================= */
@@ -556,6 +572,20 @@
     public: true,
     render() {
       const st = S();
+      try {
+        const params = new URLSearchParams(location.search);
+        const invParam = (params.get("inv") || "").trim().toUpperCase();
+        if (invParam && st._autoInv !== invParam) {
+          st.tab = "invoice";
+          st.inv.code = invParam;
+          const matched = findSaleByCode(invParam);
+          if (matched) {
+            st.inv.saleId = matched.id;
+            st.inv.code = saleCode(matched);
+            st._autoInv = invParam;
+          }
+        }
+      } catch (e) {}
       if (!["book", "bottle", "invoice"].includes(st.tab)) st.tab = "book";
       const content = st.tab === "book" ? bookTab() : st.tab === "bottle" ? bottleTab() : invoiceTab();
       return '<div class="site cu-site">' + header() + '<main class="site-main">' + hero() + content + "</main>" + footer() + "</div>";
@@ -568,7 +598,7 @@
     },
     hotkeys(ev) {
       if (ev.key !== "Enter" || App._modal || !ev.target || !ev.target.id) return;
-      const map = { "cu-lk-phone": "customer.lookup", "cu-bt-phone": "customer.otpSend", "cu-otp": "customer.otpVerify", "cu-inv-code": "customer.invFind", "cu-tax": "customer.taxLookup" };
+      const map = { "cu-lk-phone": "customer.lookup", "cu-bt-phone": App.isDemo() ? "customer.otpSend" : "customer.btVerifyCard", "cu-bt-card": "customer.btVerifyCard", "cu-otp": "customer.otpVerify", "cu-inv-code": "customer.invFind", "cu-tax": "customer.taxLookup" };
       const act = map[ev.target.id];
       if (act) { ev.preventDefault(); App.run(act, {}); }
     },
@@ -579,17 +609,37 @@
     if (c.length < 6) return null;
     return Store.data.sales.find((s) => saleCode(s) === c) || null;
   }
-  function fillTax(code, silent) {
+  async function fillTax(code, silent) {
     const v = S().inv;
     const c = String(code || "").replace(/[\s-]/g, "");
     if (!c) return;
     const r = Engine.lookupTaxCode(c);
     if (r) {
       v.company = r.name;
-      v.address = r.address;
+      v.address = r.address || v.address;
+      if (r.email && !v.email) v.email = r.email;
       if (!silent) App.toast("Đã điền thông tin " + r.name, "success");
-    } else if (!silent || /^\d{10}(\d{3})?$/.test(c)) {
-      App.toast("Không tìm thấy mã số thuế trong danh bạ. Vui lòng tự nhập tên và địa chỉ đơn vị.", "warning");
+      App.render();
+      return;
+    }
+    if (/^\d{10}(\d{3})?$/.test(c) && typeof fetch === "function") {
+      try {
+        const resp = await fetch("/api/tax-lookup/" + encodeURIComponent(c));
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.ok && data.name) {
+            v.company = data.name;
+            v.address = data.address || v.address;
+            if (data.email && !v.email) v.email = data.email;
+            if (!silent) App.toast("Đã điền thông tin " + data.name, "success");
+            App.render();
+            return;
+          }
+        }
+      } catch (e) {}
+    }
+    if (!silent) {
+      App.toast("Chưa có sẵn thông tin MST này. Vui lòng nhập tên và địa chỉ đơn vị.", "info");
     }
     App.render();
   }
@@ -692,6 +742,24 @@
     },
     /* Ruou gui */
     "customer.btDemo": (d) => { S().bt.phone = d.v; App.render(); },
+    "customer.btVerifyCard": () => {
+      const b = S().bt;
+      if (!validPhone(b.phone)) return App.toast("Số điện thoại gồm 10 chữ số, bắt đầu bằng số 0.", "error");
+      const normCard = String(b.cardCode || "").trim().toUpperCase().replace(/[\s\-]/g, "");
+      if (!normCard) return App.toast("Vui lòng nhập mã thẻ gửi rượu (VD: RG-0017).", "error");
+      const phone = normPhone(b.phone);
+      const list = Engine.findBottles(phone);
+      if (!list.length) return App.toast("Không tìm thấy chai rượu nào đang lưu giữ với số điện thoại này.", "error");
+      const matched = list.some((bt) => {
+        const c = String(bt.code || "").toUpperCase().replace(/[\s\-]/g, "");
+        const digits = c.replace(/\D/g, "");
+        const inDigits = normCard.replace(/\D/g, "");
+        return c === normCard || (digits && inDigits && Number(digits) === Number(inDigits));
+      });
+      if (!matched) return App.toast("Mã thẻ gửi rượu không khớp với số điện thoại. Vui lòng kiểm tra lại phiếu gửi rượu.", "error");
+      b.verified = phone;
+      App.render();
+    },
     "customer.otpSend": () => {
       const b = S().bt;
       const phone = b.code ? b.target : b.phone;
@@ -711,7 +779,7 @@
       App.render();
     },
     "customer.otpChange": () => { const b = S().bt; b.code = ""; b.otp = ""; App.render(); },
-    "customer.btLogout": () => { const b = S().bt; b.verified = ""; b.code = ""; b.otp = ""; App.render(); },
+    "customer.btLogout": () => { const b = S().bt; b.verified = ""; b.cardCode = ""; b.code = ""; b.otp = ""; App.render(); },
     /* Xuat hoa don */
     "customer.invFind": () => {
       const v = S().inv;
@@ -734,7 +802,7 @@
     "customer.invSubmit": () => {
       const v = S().inv;
       v.tried = true;
-      const ei = App.commit(() => Engine.requestEInvoice({ saleId: v.saleId, taxCode: String(v.taxCode || "").replace(/[\s-]/g, ""), company: String(v.company || "").trim(), address: String(v.address || "").trim(), email: String(v.email || "").trim() }), (r) => "Đã phát hành hóa đơn " + r.invoiceNo);
+      const ei = App.commit(() => Engine.requestEInvoice({ saleId: v.saleId, taxCode: String(v.taxCode || "").replace(/[\s-]/g, ""), company: String(v.company || "").trim(), address: String(v.address || "").trim(), email: String(v.email || "").trim() }), (r) => (r.status === "requested" ? "Đã tiếp nhận yêu cầu xuất hóa đơn " + r.invoiceNo : "Đã phát hành hóa đơn " + r.invoiceNo));
       if (ei) { v.resultId = ei.id; v.tried = false; App.render(); scrollTop(); }
       else App.render();
     },

@@ -10,6 +10,7 @@ Ho tro:
 
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -135,9 +136,33 @@ def get_database_uri() -> str:
         return _db_uri
 
 
+def get_masked_database_uri() -> str:
+    uri = get_database_uri()
+    return re.sub(r"://([^:/@]+):([^@]+)@", r"://\1:********@", uri)
+
+
 def get_connection():
     uri = get_database_uri()
     return psycopg2.connect(uri)
+
+
+def verify_admin_staff(staff_id: str, staff_pin: str) -> bool:
+    sid = (staff_id or "").strip()
+    pin = (staff_pin or "").strip()
+    if not sid or not pin:
+        return False
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM staff WHERE id = %s AND pin = %s AND active = TRUE AND role IN ('owner', 'accountant') LIMIT 1",
+                (sid, pin),
+            )
+            return cur.fetchone() is not None
+    except Exception:
+        return False
+    finally:
+        conn.close()
 
 
 def init_schema() -> Dict[str, Any]:
@@ -154,7 +179,10 @@ def init_schema() -> Dict[str, Any]:
                     cur.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS preferred_tip_mode TEXT")
                     cur.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS merged_pay_codes_json JSONB DEFAULT '[]'::jsonb")
                     cur.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS handed_over_from TEXT")
+                    cur.execute("ALTER TABLE tickets ADD COLUMN IF NOT EXISTS extra_json JSONB DEFAULT '{}'::jsonb")
                     cur.execute("ALTER TABLE ticket_items ADD COLUMN IF NOT EXISTS extra_json JSONB DEFAULT '{}'::jsonb")
+                    cur.execute("ALTER TABLE wastage_reports ADD COLUMN IF NOT EXISTS photo_url TEXT")
+                    cur.execute("ALTER TABLE approvals ADD COLUMN IF NOT EXISTS photo_url TEXT")
                     cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS pay_code TEXT")
                     cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS tip_mode TEXT")
                     cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS tip_shares_json JSONB DEFAULT '[]'::jsonb")
@@ -185,7 +213,7 @@ def init_schema() -> Dict[str, Any]:
             return {
                 "ok": True,
                 "mode": _db_mode,
-                "uri": get_database_uri(),
+                "uri": get_masked_database_uri(),
                 "database": dbname,
                 "version": ver,
             }
@@ -575,6 +603,18 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                     cur.execute("DELETE FROM ticket_items")
                     cur.execute("DELETE FROM tickets")
                     for tk in data.get("tickets") or []:
+                        tk_extra = {
+                            k: tk[k]
+                            for k in (
+                                "prebillOutdated",
+                                "prebillInvalidatedAt",
+                                "prebillInvalidatedBy",
+                                "prebillInvalidatedReason",
+                                "postPrebillAdjustments",
+                                "handedOverAt",
+                            )
+                            if k in tk and tk[k] is not None
+                        }
                         cur.execute(
                             """
                             INSERT INTO tickets (
@@ -582,8 +622,8 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                                 booking_id, deposit, prebill_at, prebill_by, prebill_count,
                                 prebill_requested_at, prebill_requested_by, unlock_count, part,
                                 split_from, discount_json, payments_json, sale_id, pay_code, preferred_tip_mode,
-                                merged_pay_codes_json, handed_over_from
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                merged_pay_codes_json, handed_over_from, extra_json
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """,
                             (
                                 tk["id"],
@@ -610,6 +650,7 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                                 tk.get("preferredTipMode"),
                                 _j(tk.get("mergedPayCodes") or []),
                                 tk.get("handedOverFrom"),
+                                _j(tk_extra),
                             ),
                         )
                         for idx, it in enumerate(tk.get("items") or []):
@@ -835,8 +876,8 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                             """
                             INSERT INTO wastage_reports (
                                 id, reported_at, menu_id, bag_id, kind, piece_count, weight_kg,
-                                qty, amount, reason, reported_by, photo, status, resolved_by, resolved_at
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                qty, amount, reason, reported_by, photo, photo_url, status, resolved_by, resolved_at
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """,
                             (
                                 ws["id"],
@@ -851,6 +892,7 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                                 ws.get("reason") or "",
                                 ws.get("by") or "",
                                 bool(ws.get("photo", True)),
+                                ws.get("photoUrl"),
                                 ws.get("status") or "pending",
                                 ws.get("resolvedBy"),
                                 ws.get("resolvedAt"),
@@ -957,8 +999,8 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                             """
                             INSERT INTO approvals (
                                 id, approval_type, status, created_at, requested_by, ref_id, item_id,
-                                title, amount, minutes, reason, photo, payload_json, resolved_by, resolved_at, resolve_note
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                title, amount, minutes, reason, photo, photo_url, payload_json, resolved_by, resolved_at, resolve_note
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """,
                             (
                                 ap["id"],
@@ -973,6 +1015,7 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                                 ap.get("minutes"),
                                 ap.get("reason") or "",
                                 bool(ap.get("photo", False)),
+                                ap.get("photoUrl"),
                                 _j(ap["payload"]) if ap.get("payload") else None,
                                 ap.get("resolvedBy"),
                                 ap.get("resolvedAt"),
@@ -1488,6 +1531,11 @@ def load_state_from_postgres() -> Optional[Dict[str, Any]]:
                         tk["mergedPayCodes"] = r["merged_pay_codes_json"]
                     if r.get("handed_over_from"):
                         tk["handedOverFrom"] = r["handed_over_from"]
+                    tk_ex = r.get("extra_json") or {}
+                    if isinstance(tk_ex, dict):
+                        for ek, ev in tk_ex.items():
+                            if ev is not None:
+                                tk[ek] = ev
                     tickets.append(tk)
 
                 # Sales
@@ -1645,11 +1693,15 @@ def load_state_from_postgres() -> Optional[Dict[str, Any]]:
                     }
                     if r["menu_id"]:
                         w["menuId"] = r["menu_id"]
-                        w["count"] = int(r["piece_count"])
-                        w["kg"] = _flt(r["weight_kg"])
+                        if r["kind"] == "seafood":
+                            w["count"] = int(r["piece_count"])
+                            w["kg"] = _flt(r["weight_kg"])
                     if r["bag_id"]:
                         w["bagId"] = r["bag_id"]
+                    if r["qty"]:
                         w["qty"] = int(r["qty"])
+                    if r.get("photo_url"):
+                        w["photoUrl"] = r["photo_url"]
                     if r["resolved_by"]:
                         w["resolvedBy"] = r["resolved_by"]
                     if r["resolved_at"] is not None:
@@ -1750,6 +1802,8 @@ def load_state_from_postgres() -> Optional[Dict[str, Any]]:
                         ap["minutes"] = int(r["minutes"])
                     if r["photo"]:
                         ap["photo"] = True
+                    if r.get("photo_url"):
+                        ap["photoUrl"] = r["photo_url"]
                     if r["payload_json"]:
                         ap["payload"] = r["payload_json"]
                     if r["resolved_by"]:
@@ -1962,7 +2016,7 @@ def get_db_overview() -> Dict[str, Any]:
             return {
                 "engine": "PostgreSQL",
                 "mode": _db_mode,
-                "uri": get_database_uri(),
+                "uri": get_masked_database_uri(),
                 "database": dbname,
                 "version": ver,
                 "sizeBytes": int(dbsize),

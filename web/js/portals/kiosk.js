@@ -1143,11 +1143,37 @@
       if (!f) return;
       const reader = new FileReader();
       reader.onload = () => {
-        const w = S().waste;
-        w.photo = true;
-        w.photoUrl = String(reader.result || "");
-        w.photoAt = Date.now();
-        App.render();
+        const rawUrl = String(reader.result || "");
+        const applyPhoto = (finalUrl) => {
+          const w = S().waste;
+          w.photo = true;
+          w.photoUrl = finalUrl;
+          w.photoAt = Date.now();
+          App.render();
+        };
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxDim = 900;
+            let width = img.width || 1;
+            let height = img.height || 1;
+            if (width > maxDim || height > maxDim) {
+              const ratio = Math.min(maxDim / width, maxDim / height);
+              width = Math.max(1, Math.round(width * ratio));
+              height = Math.max(1, Math.round(height * ratio));
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            applyPhoto(canvas.toDataURL("image/jpeg", 0.72));
+          } catch (e) {
+            applyPhoto(rawUrl);
+          }
+        };
+        img.onerror = () => applyPhoto(rawUrl);
+        img.src = rawUrl;
       };
       reader.readAsDataURL(f);
     },

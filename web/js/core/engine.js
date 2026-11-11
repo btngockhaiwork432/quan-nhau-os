@@ -1517,12 +1517,18 @@
       if (bk) bk.status = "completed";
     }
     if (!opts.silentPrint) {
-      const doc = E.billDoc(tk, "receipt", { at, payments: pays, change, tip, qr: C().receipt.showQr ? "https://hoadon.quannhau.vn/" + sale.id : null, qrLabel: C().receipt.footer, saleId: sale.id });
+      const doc = E.billDoc(tk, "receipt", { at, payments: pays, change, tip, qr: C().receipt.showQr ? E.invoiceQrUrl(sale.id) : null, qrLabel: C().receipt.footer, saleId: sale.id });
       E.print("p_cashier", doc);
       sale.receipt = true;
     }
     clearNotify("prebill_request", tk.id);
     return sale;
+  };
+
+  E.invoiceQrUrl = function (saleId) {
+    const code = String(saleId || "").slice(-8).toUpperCase();
+    const origin = typeof location !== "undefined" && /^https?:/.test(location.protocol) ? location.origin : "https://munbao.com";
+    return origin + "/customer?inv=" + encodeURIComponent(code);
   };
 
   // Tim ticket dang mo khop voi noi dung chuyen khoan ngan hang (chua payCode, mergedPayCodes hoac ma ban)
@@ -2401,9 +2407,19 @@
     if (!x.photo) fail("Cần chụp ảnh bằng chứng trước khi gửi.");
     if (!x.reason || x.reason.trim().length < 3) fail("Vui lòng nhập lý do.");
     const d = D();
+    const photoUrl = x.photoUrl || null;
     let w;
     let name = "";
-    if (x.menuId) {
+    const drinkRef = x.drinkId || (x.kind === "drink" ? x.menuId : null) || (x.menuId && E.menu(x.menuId) && E.menu(x.menuId).kind !== "seafood" ? x.menuId : null);
+    if (drinkRef) {
+      const m = E.menu(drinkRef);
+      if (!m) fail("Không tìm thấy mặt hàng đồ uống.");
+      const qty = Number(x.qty) || 0;
+      if (!(qty > 0)) fail("Nhập số lượng hao hụt.");
+      d.drinks[m.id] = Math.max(0, (d.drinks[m.id] || 0) - qty);
+      w = { id: U.uid("ws"), at: Date.now(), menuId: m.id, kind: "drink", qty, amount: qty * (m.cost || 0), reason: x.reason, by: x.by, photo: true, photoUrl, status: "pending" };
+      name = m.name + " x" + w.qty + " " + (m.unit || "lon");
+    } else if (x.menuId) {
       const m = E.menu(x.menuId);
       if (!m) fail("Không tìm thấy mặt hàng hải sản.");
       const t = E.syncTank(x.menuId);
@@ -2432,29 +2448,21 @@
       }
       if (!(kg > 0)) fail("Nhập khối lượng hoặc chọn con cá bị hỏng.");
       const fishNote = removedFish.length ? " (" + removedFish.map((f) => f.code).join(", ") + ")" : "";
-      w = { id: U.uid("ws"), at: Date.now(), menuId: m.id, kind: "seafood", count, kg, fishIds: removedFish.map((f) => f.id), amount: Math.round(kg * (m.costPerKg || 0)), reason: x.reason + fishNote, by: x.by, photo: true, status: "pending" };
+      w = { id: U.uid("ws"), at: Date.now(), menuId: m.id, kind: "seafood", count, kg, fishIds: removedFish.map((f) => f.id), amount: Math.round(kg * (m.costPerKg || 0)), reason: x.reason + fishNote, by: x.by, photo: true, photoUrl, status: "pending" };
       name = m.name + " " + (w.count ? w.count + " con, " : "") + U.kg(w.kg) + fishNote;
-    } else if (x.drinkId) {
-      const m = E.menu(x.drinkId);
-      if (!m) fail("Không tìm thấy mặt hàng đồ uống.");
-      const qty = Number(x.qty) || 0;
-      if (!(qty > 0)) fail("Nhập số lượng hao hụt.");
-      d.drinks[m.id] = Math.max(0, (d.drinks[m.id] || 0) - qty);
-      w = { id: U.uid("ws"), at: Date.now(), menuId: m.id, kind: "drink", qty, amount: qty * (m.cost || 0), reason: x.reason, by: x.by, photo: true, status: "pending" };
-      name = m.name + " x" + w.qty + " " + (m.unit || "lon");
     } else {
       const b = E.bag(x.bagId);
       if (!b) fail("Không tìm thấy nguyên liệu bếp.");
       const qty = Number(x.qty) || 0;
       if (!(qty > 0)) fail("Nhập số lượng hao hụt.");
       d.stock[b.id] = Math.max(0, (d.stock[b.id] || 0) - qty);
-      w = { id: U.uid("ws"), at: Date.now(), bagId: b.id, kind: "bag", qty, amount: qty * (b.cost || 0), reason: x.reason, by: x.by, photo: true, status: "pending" };
+      w = { id: U.uid("ws"), at: Date.now(), bagId: b.id, kind: "bag", qty, amount: qty * (b.cost || 0), reason: x.reason, by: x.by, photo: true, photoUrl, status: "pending" };
       name = b.name + " x" + w.qty + " " + (b.unit || "túi");
     }
     d.wastage.unshift(w);
     const auto = Number(C().inventory.wasteAutoApproveUnder) || 0;
     if (w.amount <= auto) w.status = "approved";
-    else E.createApproval({ type: "wastage", by: x.by, ref: w.id, title: "Hao hụt: " + name, amount: w.amount, reason: w.reason, photo: true });
+    else E.createApproval({ type: "wastage", by: x.by, ref: w.id, title: "Hao hụt: " + name, amount: w.amount, reason: w.reason, photo: true, photoUrl });
     return w;
   };
 
@@ -2688,7 +2696,7 @@
     const table = free.sort((a, b) => a.seats - b.seats)[0];
     const cfg = C().booking;
     const isVip = table.type === "vip";
-    const deposit = cfg.depositRequired ? (isVip ? cfg.depositVip : cfg.depositNormal) : 0;
+    const deposit = x.deposit !== undefined && x.deposit !== null ? Math.max(0, Number(x.deposit) || 0) : (cfg.depositRequired ? (isVip ? cfg.depositVip : cfg.depositNormal) : 0);
     const bk = { id: U.uid("bk"), code: "DB" + String(Date.now()).slice(-6), name: x.name, phone: String(x.phone).replace(/\s/g, ""), dayKey: x.dayKey, time: x.time, guests: Number(x.guests) || 2, areaId: x.areaId, tableId: table.id, deposit, depositPaid: deposit === 0, status: deposit ? "holding" : "confirmed", createdAt: Date.now(), holdUntil: deposit ? Date.now() + cfg.holdMinutes * MIN : null, note: x.note || "", source: x.source || "web" };
     D().bookings.push(bk);
     return bk;
@@ -2722,21 +2730,39 @@
     "0109876543": { name: "Công ty Cổ phần Công nghệ An Phát", address: "12 Duy Tân, Cầu Giấy, Hà Nội" },
     "0316789012": { name: "Công ty TNHH Dịch vụ Sao Việt", address: "220 Điện Biên Phủ, Q.3, TP. Hồ Chí Minh" },
   };
-  E.lookupTaxCode = (code) => TAX_DIR[String(code || "").trim()] || null;
+  E.lookupTaxCode = function (code) {
+    const c = String(code || "").trim().replace(/[\s-]/g, "");
+    if (!c) return null;
+    const prev = (D().einvoices || []).find((e) => String(e.taxCode || "").replace(/[\s-]/g, "") === c && e.company);
+    if (prev) return { name: prev.company, address: prev.address || "", email: prev.email || "" };
+    return TAX_DIR[c] || null;
+  };
   E.saleById = (id) => D().sales.find((s) => s.id === id);
   E.requestEInvoice = function (x) {
     const s = E.saleById(x.saleId);
     if (!s) fail("Không tìm thấy hóa đơn. Kiểm tra lại mã trên bill.");
-    if (s.einvoice) fail("Hóa đơn này đã được xuất (" + s.einvoice.invoiceNo + ").");
+    if (s.einvoice) fail("Hóa đơn này đã được yêu cầu (" + s.einvoice.invoiceNo + ").");
     const hours = Number(C().tax.einvoiceWindowHours) || 24;
     if (Date.now() - s.closedAt > hours * 3600000) fail("Đã quá " + hours + " giờ kể từ khi thanh toán. Vui lòng liên hệ quán.");
     if (!/^\d{10}(\d{3})?$/.test(String(x.taxCode || "").replace(/-/g, ""))) fail("Mã số thuế gồm 10 hoặc 13 chữ số.");
     if (!x.company) fail("Nhập tên đơn vị.");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.email || "")) fail("Email không hợp lệ.");
-    const no = "C26MTT-" + String(1285 + D().einvoices.length).padStart(8, "0");
-    const ei = { id: U.uid("ei"), saleId: s.id, taxCode: x.taxCode, company: x.company, address: x.address || "", email: x.email, amount: s.grand, at: Date.now(), status: "issued", invoiceNo: no };
+    const isDemoMode = typeof window !== "undefined" && window.App && typeof window.App.isDemo === "function" && window.App.isDemo();
+    const no = (isDemoMode ? "C26MTT-" : "YCHD-") + String(1285 + D().einvoices.length).padStart(8, "0");
+    const status = isDemoMode ? "issued" : "requested";
+    const ei = { id: U.uid("ei"), saleId: s.id, taxCode: x.taxCode, company: x.company, address: x.address || "", email: x.email, amount: s.grand, at: Date.now(), status, invoiceNo: no };
     D().einvoices.unshift(ei);
-    s.einvoice = { invoiceNo: no, at: ei.at };
+    s.einvoice = { invoiceNo: no, at: ei.at, status };
+    return ei;
+  };
+  E.markEInvoiceIssued = function (id, officialNo) {
+    const ei = (D().einvoices || []).find((x) => x.id === id);
+    if (!ei) fail("Không tìm thấy yêu cầu xuất hóa đơn.");
+    ei.status = "issued";
+    if (officialNo && String(officialNo).trim()) ei.invoiceNo = String(officialNo).trim();
+    else if (String(ei.invoiceNo || "").startsWith("YCHD-")) ei.invoiceNo = ei.invoiceNo.replace(/^YCHD-/, "C26MTT-");
+    const s = ei.saleId ? E.saleById(ei.saleId) : null;
+    if (s) s.einvoice = { invoiceNo: ei.invoiceNo, at: Date.now(), status: "issued" };
     return ei;
   };
 

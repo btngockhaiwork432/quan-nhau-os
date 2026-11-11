@@ -1189,7 +1189,7 @@
       if (rc.showQr) {
         const qr = kind === "prebill"
           ? U.vietQr({ bin: s.bankBin || "970436", account: s.bankAccount || "00000000", amount: 2905000, memo: "BAN T02" })
-          : "https://phobien.vn/einvoice?code=HD261104-008";
+          : ((typeof location !== "undefined" && /^https?:/.test(location.protocol) ? location.origin : "https://munbao.com") + "/customer?inv=HD261104");
         lines.push(
           { t: "sep" },
           { t: "center", text: kind === "prebill" ? "Quét mã VietQR để chuyển khoản" : (rc.footer || "Quét mã để xuất hóa đơn VAT trong 24h") },

@@ -669,12 +669,17 @@
       UI.kpi({ label: isCo ? "Tổng thuế GTGT đầu ra" : "Thuế khoán HKD (" + C().tax.hkdRate + "%)", icon: "landmark", value: U.money(isCo ? totalVat : tot.hkdTax), meta: locked ? "Kỳ thuế đã khóa sổ" : "Kỳ thuế đang mở", tone: locked ? "good" : "" }) +
       "</div>";
 
-    const invRows = D().einvoices.slice(0, 50).map((e) => "<tr>" +
-      '<td class="nowrap"><b>' + esc(e.invoiceNo || e.no || e.id) + "</b></td>" +
-      "<td>" + U.dateTime(e.at) + "</td>" +
-      "<td><b>" + esc(e.company || "Khách lẻ") + '</b><div class="small muted">MST: ' + esc(e.taxCode || "-") + " · " + esc(e.email || "") + "</div></td>" +
-      '<td class="num strong">' + U.money(e.amount || e.total || 0) + "</td>" +
-      "<td>" + UI.badge("Đã phát hành (" + C().tax.einvoiceProvider + ")", "success", true) + "</td></tr>").join("");
+    const invRows = D().einvoices.slice(0, 50).map((e) => {
+      const isPending = e.status === "requested";
+      return "<tr>" +
+        '<td class="nowrap"><b>' + esc(e.invoiceNo || e.no || e.id) + "</b></td>" +
+        "<td>" + U.dateTime(e.at) + "</td>" +
+        "<td><b>" + esc(e.company || "Khách lẻ") + '</b><div class="small muted">MST: ' + esc(e.taxCode || "-") + (e.address ? " · " + esc(e.address) : "") + " · " + esc(e.email || "") + "</div></td>" +
+        '<td class="num strong">' + U.money(e.amount || e.total || 0) + "</td>" +
+        "<td>" + (isPending
+          ? '<div class="row gap-8 wrap">' + UI.badge("Chờ kế toán xuất", "warning", true) + UI.btn("Đánh dấu đã xuất", { size: "sm", kind: "primary", icon: "check", act: "owner.issueEInvoice", data: { id: e.id } }) + "</div>"
+          : UI.badge("Đã phát hành (" + C().tax.einvoiceProvider + ")", "success", true)) + "</td></tr>";
+    }).join("");
 
     return '<div class="page">' +
       head("Thuế và hóa đơn điện tử", "Tách tự động thuế suất đồ ăn (" + C().tax.food + "%) và rượu bia (" + C().tax.alcohol + "%), xuất bảng kê chuẩn kế toán.",
@@ -683,7 +688,7 @@
         UI.btn(locked ? "Đã khóa kỳ thuế" : "Khóa sổ kỳ thuế", { size: "sm", kind: locked ? "" : "primary", icon: "lock", act: "owner.lockTax", disabled: locked })
       ) +
       kpis +
-      card("Hóa đơn điện tử GTGT đã phát hành (" + D().einvoices.length + ")", invRows ? tbl('<th>Số HĐ</th><th>Thời điểm</th><th>Đơn vị mua / Mã số thuế</th><th class="num">Tổng thanh toán</th><th>Trạng thái</th>', invRows) : UI.empty("receipt-text", "Chưa có hóa đơn điện tử nào phát hành"), { icon: "receipt-text", flush: true }) +
+      card("Yêu cầu & Hóa đơn điện tử GTGT (" + D().einvoices.length + ")", invRows ? tbl('<th>Số tham chiếu / HĐ</th><th>Thời điểm</th><th>Đơn vị mua / Mã số thuế / Địa chỉ / Email</th><th class="num">Tổng thanh toán</th><th>Trạng thái</th>', invRows) : UI.empty("receipt-text", "Chưa có yêu cầu hoặc hóa đơn điện tử nào"), { icon: "receipt-text", flush: true }) +
       "</div>";
   }
 
@@ -949,9 +954,18 @@
         ["Thuế GTGT rượu bia", tot.vatAlcohol],
         ["Tổng thuế GTGT", tot.vatFood + tot.vatAlcohol],
         ["Thuế khoán HKD", tot.hkdTax],
+        [],
+        ["Số HĐ / Tham chiếu", "Thời điểm", "Đơn vị mua", "Mã số thuế", "Địa chỉ", "Email", "Số tiền", "Trạng thái"],
       ];
+      (tx.einvoices || []).forEach((e) => {
+        rows.push([e.invoiceNo || e.id, U.dateTime(e.at), e.company || "", e.taxCode || "", e.address || "", e.email || "", e.amount || 0, e.status === "requested" ? "Chờ xuất" : "Đã phát hành"]);
+      });
       U.downloadCsv("bao_cao_thue_" + mk + ".csv", rows);
       App.toast("Đã xuất bảng kê thuế " + U.monthLabel(mk), "success");
+    },
+    "owner.issueEInvoice": (d) => {
+      const r = App.commit(() => Engine.markEInvoiceIssued(d.id), "Đã đánh dấu phát hành hóa đơn điện tử");
+      if (r) App.render();
     },
     "owner.lockTax": async () => {
       const mk = curMonth();

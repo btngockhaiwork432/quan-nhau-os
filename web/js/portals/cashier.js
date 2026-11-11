@@ -1480,7 +1480,7 @@
         sub: "Bill đã tự động chuyển sang trạng thái Khóa chống sửa đổi.",
         size: "sm",
         body: () => UI.receipt(job),
-        foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
+        foot: () => UI.btn("In ra máy in K80", { icon: "printer", act: "app.printK80" }) + UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
       });
     },
     "cashier.previewK80": () => {
@@ -1491,7 +1491,7 @@
         title: "Xem trước mẫu in K80",
         size: "sm",
         body: () => UI.receipt(job),
-        foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
+        foot: () => UI.btn("In ra máy in K80", { icon: "printer", act: "app.printK80" }) + UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
       });
     },
     "cashier.unlockGrace": (d) => {
@@ -1838,7 +1838,7 @@
           sub: "Đã mở két tiền và in mã QR tự xuất hóa đơn VAT trong 24h.",
           size: "sm",
           body: () => UI.receipt(job),
-          foot: () => UI.btn("Hoàn tất", { kind: "primary", act: "app.closeModal" }),
+          foot: () => UI.btn("In ra máy in K80", { icon: "printer", act: "app.printK80" }) + UI.btn("Hoàn tất", { kind: "primary", act: "app.closeModal" }),
         });
       }
     },
@@ -1849,6 +1849,7 @@
       s.bkName = "";
       s.bkPhone = "";
       s.bkGuests = 6;
+      s.bkDay = U.dayKey();
       s.bkTime = "19:00";
       s.bkArea = (cfg().areas[0] || {}).id || "ar_garden";
       s.bkDeposit = cfg().booking.depositNormal || 200000;
@@ -1860,11 +1861,13 @@
           return '<div class="grid-2">' +
             UI.field("Tên khách đặt", UI.input({ model: "cashier.bkName", value: st.bkName, placeholder: "Anh Tuấn..." })) +
             UI.field("Số điện thoại", UI.input({ model: "cashier.bkPhone", value: st.bkPhone, placeholder: "090..." })) +
-            UI.field("Số lượng khách", UI.input({ type: "number", model: "cashier.bkGuests", value: st.bkGuests })) +
+            UI.field("Ngày hẹn đến", UI.input({ type: "date", model: "cashier.bkDay", value: st.bkDay, min: U.dayKey() })) +
             UI.field("Giờ hẹn đến", UI.input({ type: "time", model: "cashier.bkTime", value: st.bkTime })) +
+            UI.field("Số lượng khách", UI.input({ type: "number", model: "cashier.bkGuests", value: st.bkGuests })) +
             UI.field("Khu vực ưu tiên", UI.select({ model: "cashier.bkArea", value: st.bkArea, options: cfg().areas.map((a) => ({ value: a.id, label: a.name })) })) +
             UI.field("Tiền cọc (đ)", UI.input({ type: "number", model: "cashier.bkDeposit", value: st.bkDeposit })) +
-            "</div>" + UI.field("Ghi chú", UI.input({ model: "cashier.bkNote", value: st.bkNote, placeholder: "Có trẻ em, cần ghế phụ..." }));
+            UI.field("Ghi chú", UI.input({ model: "cashier.bkNote", value: st.bkNote, placeholder: "Có trẻ em, cần ghế phụ..." })) +
+            "</div>";
         },
         foot: () => UI.btn("Hủy", { act: "app.closeModal" }) + UI.btn("Tạo phiếu đặt bàn", { kind: "primary", act: "cashier.bookingCreate" }),
       });
@@ -1876,9 +1879,10 @@
         name: s.bkName,
         phone: s.bkPhone,
         guests: Number(s.bkGuests) || 4,
-        dayKey: U.dayKey(),
+        dayKey: s.bkDay || U.dayKey(),
         time: s.bkTime || "19:00",
         areaId: s.bkArea,
+        deposit: s.bkDeposit !== undefined && s.bkDeposit !== "" ? Number(s.bkDeposit) : undefined,
         note: s.bkNote || "",
         source: "cashier",
       }), "Đã tạo lịch đặt bàn");
@@ -1936,13 +1940,15 @@
         meta: [{ l: "Bàn", r: s.tableCode || s.tableId }, { l: "Giờ đóng", r: U.time(s.closedAt) }, { l: "Số khách", r: String(s.guests || 4) }],
         rows: (s.lines || []).map((ln) => ({ l: (ln.kg ? U.num(ln.kg, 2) + "kg " : ln.qty + "x ") + ln.name, r: U.moneyPlain(ln.amount) })),
         sumRows: [{ l: "TỔNG CỘNG", r: U.moneyPlain(s.grand), bold: true }],
+        qr: cfg().receipt.showQr && Engine.invoiceQrUrl ? Engine.invoiceQrUrl(s.id) : null,
+        qrLabel: cfg().receipt.footer,
         saleId: s.id,
       };
       App.modal({
         title: "Bản sao hóa đơn thanh toán",
         size: "sm",
         body: () => UI.receipt(doc),
-        foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
+        foot: () => UI.btn("In ra máy in K80", { icon: "printer", act: "app.printK80" }) + UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
       });
     },
     "cashier.issueVat": (d) => {
@@ -1998,7 +2004,7 @@
         title: "Nhật ký lệnh in nhiệt K80 (" + D().printLog.length + ")",
         size: "lg",
         body: () => logs.length
-          ? '<div class="print-log">' + logs.map((p) => '<div class="col gap-4"><div class="small muted center">' + U.dateTime(p.at) + " · " + esc(p.printerName || "") + (p.rerouted ? " (Chuyển dự phòng từ " + esc(p.rerouted) + ")" : "") + (p.superseded ? ' <span class="badge badge-danger">HẾT HIỆU LỰC</span>' : "") + "</div>" + UI.receipt(p) + "</div>").join("") + "</div>"
+          ? '<div class="print-log">' + logs.map((p, idx) => '<div class="col gap-4"><div class="row between items-center small muted"><span>' + U.dateTime(p.at) + " · " + esc(p.printerName || "") + (p.rerouted ? " (Chuyển dự phòng từ " + esc(p.rerouted) + ")" : "") + (p.superseded ? ' <span class="badge badge-danger">HẾT HIỆU LỰC</span>' : "") + "</span>" + UI.btn("In lại K80", { size: "xs", icon: "printer", act: "app.printK80", data: { idx } }) + "</div>" + UI.receipt(p) + "</div>").join("") + "</div>"
           : UI.empty("printer", "Chưa có lệnh in nào"),
         foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
       });

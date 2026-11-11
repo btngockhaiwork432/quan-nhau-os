@@ -640,7 +640,7 @@
       const res = fn(this.state);
       if (auditText) this.audit(auditText);
       this.save();
-      if (!isDemoMode()) this.pushToPostgres(auditText);
+      if (!isDemoMode()) this.pushToPostgres(auditText, fn);
       this.emit();
       return res;
     },
@@ -708,6 +708,23 @@
       }
       if (this._backendInitStarted) return;
       this._backendInitStarted = true;
+      const wakeupSync = () => {
+        if (isDemoMode()) return;
+        const now = Date.now();
+        if (this._lastWakeSync && now - this._lastWakeSync < 1500) return;
+        this._lastWakeSync = now;
+        this.syncFromPostgres(false).catch(() => {});
+        if (!this._sse || this._sse.readyState === 2) {
+          try { if (this._sse) this._sse.close(); } catch (e) {}
+          this._sse = null;
+          this.connectSse();
+        }
+      };
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") wakeupSync();
+      });
+      window.addEventListener("focus", wakeupSync);
+      window.addEventListener("online", wakeupSync);
       try {
         await this.syncFromPostgres(true);
         this.connectSse();
@@ -770,7 +787,14 @@
         this.backend.connected = false;
       }
     },
-    async pushToPostgres(auditText) {
+    pushToPostgres(auditText, replayFn) {
+      if (isDemoMode()) return Promise.resolve();
+      this._pushChain = (this._pushChain || Promise.resolve()).then(() =>
+        this._doPushToPostgres(auditText, replayFn, 0)
+      );
+      return this._pushChain;
+    },
+    async _doPushToPostgres(auditText, replayFn, attempt) {
       if (isDemoMode()) return;
       try {
         const who = (window.App && App.session && App.session.staffId) || "system";
@@ -782,6 +806,7 @@
             who,
             auditText: auditText || null,
             clientId: this.clientId,
+            baseRevision: this.backend.revision || null,
           }),
         });
         if (resp.ok) {
@@ -789,6 +814,42 @@
           this.backend.connected = true;
           this.backend.revision = Number(out.revision) || this.backend.revision;
           this.backend.lastSyncAt = Date.now();
+          return;
+        }
+        if (resp.status === 409) {
+          const conflict = await resp.json().catch(() => null);
+          if (conflict && conflict.state) {
+            const st = conflict.state;
+            st.config = deepMerge(defaultConfig(), st.config);
+            normalizeState(st);
+            this.state = {
+              version: 1,
+              config: st.config,
+              data: st.data,
+              session: this.state ? this.state.session : null,
+            };
+            this.backend.connected = true;
+            this.backend.revision = Number(conflict.revision) || this.backend.revision;
+            this.backend.lastSyncAt = Date.now();
+            if (typeof replayFn === "function" && (attempt || 0) < 3) {
+              try {
+                replayFn(this.state);
+                if (auditText) this.audit(auditText);
+                this.save();
+                this.emit();
+                return await this._doPushToPostgres(auditText, replayFn, (attempt || 0) + 1);
+              } catch (replayErr) {
+                this.save();
+                this.emit();
+                if (window.App && App.toast) {
+                  App.toast(replayErr.message || "Dữ liệu vừa được cập nhật từ thiết bị khác.", "warning");
+                }
+                return;
+              }
+            }
+            this.save();
+            this.emit();
+          }
         }
       } catch (e) {
         this.backend.connected = false;
@@ -814,9 +875,13 @@
       }
     },
     async querySql(query) {
+      const me = window.App && App.me ? App.me() : null;
+      const headers = { "Content-Type": "application/json" };
+      if (me && me.id) headers["X-Staff-Id"] = me.id;
+      if (me && me.pin) headers["X-Staff-Pin"] = String(me.pin);
       const resp = await fetch(this.apiBase + "/api/db/query", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ query }),
       });
       const data = await resp.json();
@@ -856,6 +921,13 @@
         };
         es.onerror = () => {
           this.backend.connected = false;
+          if (es.readyState === 2) {
+            try { es.close(); } catch (e) {}
+            if (this._sse === es) this._sse = null;
+            setTimeout(() => {
+              if (!isDemoMode() && !this._sse) this.connectSse();
+            }, 3000);
+          }
         };
       } catch (e) {}
     },

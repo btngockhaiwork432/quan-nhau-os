@@ -683,6 +683,54 @@
     "app.exportData": () => {
       U.download("quannhau-du-lieu-" + U.dayKey() + ".json", Store.exportJson(), "application/json");
     },
+    "app.printK80": (d) => {
+      const all = document.querySelectorAll("#modal-root .receipt, #app .receipt");
+      const idx = d && d.idx !== undefined ? Number(d.idx) : 0;
+      const receiptEl = all[idx] || all[0];
+      if (!receiptEl) {
+        App.toast("Không tìm thấy nội dung phiếu K80 để in.", "error");
+        return;
+      }
+      const prev = document.getElementById("k80-print-frame");
+      if (prev) prev.remove();
+      const iframe = document.createElement("iframe");
+      iframe.id = "k80-print-frame";
+      iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none";
+      document.body.appendChild(iframe);
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(
+        "<!doctype html><html><head><meta charset='utf-8'><title>Phiếu in K80</title><style>" +
+          "@page{size:80mm auto;margin:0}" +
+          "*{box-sizing:border-box}" +
+          "html,body{margin:0;padding:0;width:78mm;background:#fff;color:#000;font-family:'Be Vietnam Pro',Arial,sans-serif;font-size:12px;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}" +
+          ".receipt{width:76mm;margin:0 auto;padding:3mm 2mm 6mm;color:#000;background:#fff}" +
+          ".r-center{text-align:center}" +
+          ".r-big{font-weight:700;font-size:14px}" +
+          ".r-huge{font-weight:800;font-size:20px;letter-spacing:.5px;margin:2px 0}" +
+          ".r-sep{border-top:1px dashed #000;margin:6px 0}" +
+          ".r-row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin:2px 0}" +
+          ".r-row span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}" +
+          ".r-qr{display:flex;justify-content:center;margin:6px 0}" +
+          ".r-qr svg{width:136px;height:136px}" +
+          ".small{font-size:11px}.muted{color:#222}" +
+          "</style></head><body>" +
+          receiptEl.outerHTML +
+          "</body></html>"
+      );
+      doc.close();
+      setTimeout(() => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          window.print();
+        }
+        setTimeout(() => {
+          try { iframe.remove(); } catch (e) {}
+        }, 4000);
+      }, 150);
+    },
     "app.importData": (d, el) => {
       const f = el.files && el.files[0];
       if (!f) return;
