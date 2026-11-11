@@ -183,6 +183,13 @@ def init_schema() -> Dict[str, Any]:
                     cur.execute("ALTER TABLE ticket_items ADD COLUMN IF NOT EXISTS extra_json JSONB DEFAULT '{}'::jsonb")
                     cur.execute("ALTER TABLE wastage_reports ADD COLUMN IF NOT EXISTS photo_url TEXT")
                     cur.execute("ALTER TABLE approvals ADD COLUMN IF NOT EXISTS photo_url TEXT")
+                    cur.execute("ALTER TABLE printers ADD COLUMN IF NOT EXISTS ip_address TEXT NOT NULL DEFAULT ''")
+                    cur.execute("ALTER TABLE printers ADD COLUMN IF NOT EXISTS port INTEGER NOT NULL DEFAULT 9100")
+                    cur.execute("ALTER TABLE attendance ADD COLUMN IF NOT EXISTS selfie_url TEXT")
+                    cur.execute("ALTER TABLE attendance ADD COLUMN IF NOT EXISTS gps_meters INTEGER")
+                    cur.execute("ALTER TABLE attendance ADD COLUMN IF NOT EXISTS client_ip TEXT")
+                    cur.execute("ALTER TABLE print_logs ADD COLUMN IF NOT EXISTS printed_physical BOOLEAN NOT NULL DEFAULT FALSE")
+                    cur.execute("ALTER TABLE print_logs ADD COLUMN IF NOT EXISTS printed_physical_at BIGINT")
                     cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS pay_code TEXT")
                     cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS tip_mode TEXT")
                     cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS tip_shares_json JSONB DEFAULT '[]'::jsonb")
@@ -476,8 +483,8 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                     for pt in cfg.get("printers") or []:
                         cur.execute(
                             """
-                            INSERT INTO printers (id, name, location, purpose, copies, online, backup_id, categories_json)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            INSERT INTO printers (id, name, location, purpose, copies, online, backup_id, ip_address, port, categories_json)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """,
                             (
                                 pt["id"],
@@ -487,6 +494,8 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                                 _num(pt.get("copies"), 1),
                                 bool(pt.get("online", True)),
                                 pt.get("backupId") or "",
+                                str(pt.get("ip") or "").strip(),
+                                _num(pt.get("port"), 9100),
                                 _j(pt.get("categories") or []),
                             ),
                         )
@@ -543,8 +552,9 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                             """
                             INSERT INTO attendance (
                                 id, staff_id, day_key, segment, shift_id, check_in, check_out,
-                                method, late_min, selfie, ot_pending_min, ot_approved_min, ot_auto_min, ot_status, off_schedule
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                method, late_min, selfie, selfie_url, gps_meters, client_ip,
+                                ot_pending_min, ot_approved_min, ot_auto_min, ot_status, off_schedule
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """,
                             (
                                 att["id"],
@@ -557,6 +567,9 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                                 att.get("method") or "kiosk",
                                 _num(att.get("lateMin"), 0),
                                 bool(att.get("selfie", True)),
+                                att.get("selfieUrl"),
+                                _num(att.get("gpsMeters")) if att.get("gpsMeters") is not None else None,
+                                att.get("clientIp"),
                                 _num(att.get("otPendingMin"), 0),
                                 _num(att.get("otApprovedMin"), 0),
                                 _num(att.get("otAutoMin"), 0),
@@ -1077,15 +1090,23 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                         )
 
                     # 20. print_logs, audit_logs, notifications, other_income, tax_locks
+                    cur.execute("SELECT id, printed_physical_at FROM print_logs WHERE printed_physical = TRUE")
+                    acked_print_map = {r[0]: r[1] for r in cur.fetchall()}
                     cur.execute("DELETE FROM print_logs")
                     for pl in data.get("printLog") or []:
+                        pid_log = pl["id"]
+                        was_printed = bool(pl.get("printedPhysical")) or (pid_log in acked_print_map)
+                        printed_phys_at = pl.get("printedPhysicalAt") or acked_print_map.get(pid_log)
                         cur.execute(
                             """
-                            INSERT INTO print_logs (id, printed_at, printer_id, printer_name, kind, title, rerouted, failed, doc_json)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            INSERT INTO print_logs (
+                                id, printed_at, printer_id, printer_name, kind, title, rerouted, failed,
+                                printed_physical, printed_physical_at, doc_json
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """,
                             (
-                                pl["id"],
+                                pid_log,
                                 _num(pl.get("at"), now_ms),
                                 pl.get("printerId") or "",
                                 pl.get("printerName") or "",
@@ -1093,6 +1114,8 @@ def persist_state_to_postgres(state: Dict[str, Any], who: str = "system", audit_
                                 pl.get("title") or "",
                                 str(pl["rerouted"]) if pl.get("rerouted") else None,
                                 bool(pl.get("failed", False)),
+                                was_printed,
+                                _num(printed_phys_at) if printed_phys_at is not None else None,
                                 _j(pl),
                             ),
                         )
@@ -1334,6 +1357,8 @@ def load_state_from_postgres() -> Optional[Dict[str, Any]]:
                         "copies": int(r["copies"]),
                         "online": bool(r["online"]),
                         "backupId": r["backup_id"] or "",
+                        "ip": r.get("ip_address") or "",
+                        "port": int(r["port"]) if r.get("port") else 9100,
                     }
                     for r in cur.fetchall()
                 ]
@@ -1386,8 +1411,9 @@ def load_state_from_postgres() -> Optional[Dict[str, Any]]:
 
                 # Attendance
                 cur.execute("SELECT * FROM attendance ORDER BY check_in ASC")
-                attendance = [
-                    {
+                attendance = []
+                for r in cur.fetchall():
+                    att_item: Dict[str, Any] = {
                         "id": r["id"],
                         "staffId": r["staff_id"],
                         "dayKey": r["day_key"],
@@ -1404,8 +1430,13 @@ def load_state_from_postgres() -> Optional[Dict[str, Any]]:
                         "otStatus": r["ot_status"],
                         "offSchedule": bool(r["off_schedule"]),
                     }
-                    for r in cur.fetchall()
-                ]
+                    if r.get("selfie_url"):
+                        att_item["selfieUrl"] = r["selfie_url"]
+                    if r.get("gps_meters") is not None:
+                        att_item["gpsMeters"] = int(r["gps_meters"])
+                    if r.get("client_ip"):
+                        att_item["clientIp"] = r["client_ip"]
+                    attendance.append(att_item)
 
                 # Bookings
                 cur.execute("SELECT * FROM bookings ORDER BY created_at ASC")
@@ -2059,3 +2090,91 @@ def execute_readonly_sql(query: str, params: Optional[Tuple[Any, ...]] = None) -
             return out
     finally:
         conn.close()
+
+
+def get_pending_print_jobs(max_age_ms: int = 900_000) -> List[Dict[str, Any]]:
+    """
+    Lay danh sach cac phieu in K80 chua in ra may vat ly trong khoang thoi gian max_age_ms,
+    kem dia chi IP LAN / cong 9100 cua may in chinh va may in du phong.
+    """
+    cutoff = int(time.time() * 1000) - max(10_000, int(max_age_ms))
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT
+                    pl.id,
+                    pl.printed_at,
+                    pl.printer_id,
+                    pl.printer_name,
+                    pl.kind,
+                    pl.title,
+                    pl.rerouted,
+                    pl.doc_json,
+                    p.ip_address AS ip,
+                    p.port AS port,
+                    p.copies AS copies,
+                    p.online AS online,
+                    bp.id AS backup_printer_id,
+                    bp.name AS backup_printer_name,
+                    bp.ip_address AS backup_ip,
+                    bp.port AS backup_port
+                FROM print_logs pl
+                LEFT JOIN printers p ON p.id = pl.printer_id
+                LEFT JOIN printers bp ON bp.id = p.backup_id
+                WHERE pl.printed_physical = FALSE
+                  AND pl.failed = FALSE
+                  AND pl.printed_at >= %s
+                ORDER BY pl.printed_at ASC
+                """,
+                (cutoff,),
+            )
+            jobs = []
+            for r in cur.fetchall():
+                jobs.append(
+                    {
+                        "id": r["id"],
+                        "printedAt": int(r["printed_at"]),
+                        "printerId": r["printer_id"],
+                        "printerName": r["printer_name"],
+                        "kind": r["kind"],
+                        "title": r["title"],
+                        "rerouted": r["rerouted"],
+                        "ip": (r.get("ip") or "").strip(),
+                        "port": int(r["port"]) if r.get("port") else 9100,
+                        "copies": max(1, int(r["copies"])) if r.get("copies") else 1,
+                        "online": bool(r["online"]) if r.get("online") is not None else True,
+                        "backupPrinterId": r.get("backup_printer_id") or "",
+                        "backupPrinterName": r.get("backup_printer_name") or "",
+                        "backupIp": (r.get("backup_ip") or "").strip(),
+                        "backupPort": int(r["backup_port"]) if r.get("backup_port") else 9100,
+                        "doc": r["doc_json"] or {},
+                    }
+                )
+            return jobs
+    finally:
+        conn.close()
+
+
+def ack_print_jobs(job_ids: List[str]) -> int:
+    ids = [str(x).strip() for x in (job_ids or []) if str(x).strip()]
+    if not ids:
+        return 0
+    now_ms = int(time.time() * 1000)
+    with _db_lock:
+        conn = get_connection()
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        UPDATE print_logs
+                        SET printed_physical = TRUE, printed_physical_at = %s
+                        WHERE id = ANY(%s)
+                        """,
+                        (now_ms, ids),
+                    )
+                    return cur.rowcount or 0
+        finally:
+            conn.close()

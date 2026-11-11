@@ -259,6 +259,13 @@
       '<div class="modal-body" data-keep-scroll="modal">' + body + "</div>" +
       (foot ? '<div class="modal-foot">' + foot + "</div>" : "") +
       "</div></div>";
+    if (App._ciStream) {
+      const vid = document.getElementById("ci-live-video");
+      if (vid && vid.srcObject !== App._ciStream) {
+        vid.srcObject = App._ciStream;
+        vid.play().catch(() => {});
+      }
+    }
   }
 
   // Hop xac nhan. opts: {title, message, confirm, danger, reason: true|'optional', reasonLabel, placeholder}
@@ -691,45 +698,7 @@
         App.toast("Không tìm thấy nội dung phiếu K80 để in.", "error");
         return;
       }
-      const prev = document.getElementById("k80-print-frame");
-      if (prev) prev.remove();
-      const iframe = document.createElement("iframe");
-      iframe.id = "k80-print-frame";
-      iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none";
-      document.body.appendChild(iframe);
-      const doc = iframe.contentWindow.document;
-      doc.open();
-      doc.write(
-        "<!doctype html><html><head><meta charset='utf-8'><title>Phiếu in K80</title><style>" +
-          "@page{size:80mm auto;margin:0}" +
-          "*{box-sizing:border-box}" +
-          "html,body{margin:0;padding:0;width:78mm;background:#fff;color:#000;font-family:'Be Vietnam Pro',Arial,sans-serif;font-size:12px;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}" +
-          ".receipt{width:76mm;margin:0 auto;padding:3mm 2mm 6mm;color:#000;background:#fff}" +
-          ".r-center{text-align:center}" +
-          ".r-big{font-weight:700;font-size:14px}" +
-          ".r-huge{font-weight:800;font-size:20px;letter-spacing:.5px;margin:2px 0}" +
-          ".r-sep{border-top:1px dashed #000;margin:6px 0}" +
-          ".r-row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin:2px 0}" +
-          ".r-row span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}" +
-          ".r-qr{display:flex;justify-content:center;margin:6px 0}" +
-          ".r-qr svg{width:136px;height:136px}" +
-          ".small{font-size:11px}.muted{color:#222}" +
-          "</style></head><body>" +
-          receiptEl.outerHTML +
-          "</body></html>"
-      );
-      doc.close();
-      setTimeout(() => {
-        try {
-          iframe.contentWindow.focus();
-          iframe.contentWindow.print();
-        } catch (e) {
-          window.print();
-        }
-        setTimeout(() => {
-          try { iframe.remove(); } catch (e) {}
-        }, 4000);
-      }, 150);
+      App.printReceiptHtml(receiptEl.outerHTML);
     },
     "app.importData": (d, el) => {
       const f = el.files && el.files[0];
@@ -800,7 +769,360 @@
       }
       App.render();
     },
+    "app.ciRefreshNet": () => App._ciCheckNetwork && App._ciCheckNetwork(),
+    "app.ciRefreshGps": () => App._ciCheckGps && App._ciCheckGps(),
+    "app.ciStartCam": () => App._ciStartCamera && App._ciStartCamera(),
+    "app.ciSnap": () => {
+      const st = App._ciState;
+      const vid = document.getElementById("ci-live-video");
+      if (!st || !vid || !vid.videoWidth) {
+        App.toast("Camera đang khởi động, vui lòng đợi 1 giây rồi bấm chụp.", "warning");
+        return;
+      }
+      const w = 320;
+      const h = Math.max(200, Math.round((vid.videoHeight / vid.videoWidth) * w));
+      const cv = document.createElement("canvas");
+      cv.width = w;
+      cv.height = h;
+      const ctx = cv.getContext("2d");
+      ctx.drawImage(vid, 0, 0, w, h);
+      st.selfieUrl = cv.toDataURL("image/jpeg", 0.72);
+      App.stopCheckinCamera();
+      App.render();
+    },
+    "app.ciRetake": () => {
+      if (!App._ciState) return;
+      App._ciState.selfieUrl = null;
+      App._ciStartCamera();
+      App.render();
+    },
+    "app.ciFileSelfie": (_d, el) => {
+      const file = el && el.files && el.files[0];
+      if (!file || !App._ciState) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const w = 320;
+          const h = Math.max(200, Math.round((img.height / Math.max(1, img.width)) * w));
+          const cv = document.createElement("canvas");
+          cv.width = w;
+          cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          if (App._ciState) {
+            App._ciState.selfieUrl = cv.toDataURL("image/jpeg", 0.72);
+            App.stopCheckinCamera();
+            App.render();
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    },
+    "app.ciSubmit": () => {
+      const st = App._ciState;
+      const me = App.me();
+      if (!st || !me) return;
+      const r = App.commit(
+        () =>
+          Engine.checkIn(me.id, {
+            method: "mobile",
+            clientIp: st.clientIp,
+            gpsVerified: st.gpsVerified,
+            gpsMeters: st.gpsMeters,
+            selfie: !!st.selfieUrl,
+            selfieUrl: st.selfieUrl,
+          }),
+        (res) =>
+          res.rec.lateMin
+            ? "Đã vào ca (trễ " + res.rec.lateMin + " phút" + (res.penalty ? ", phạt " + U.money(res.penalty) : "") + ")."
+            : "Đã chấm công vào ca đúng giờ.",
+        "Chấm công vào ca (xác thực IP/GPS/Camera)"
+      );
+      if (r) {
+        App.stopCheckinCamera();
+        App.closeModal();
+      }
+    },
   });
+
+  App.printReceiptHtml = function (html) {
+    if (!html) return;
+    const prev = document.getElementById("k80-print-frame");
+    if (prev) prev.remove();
+    const iframe = document.createElement("iframe");
+    iframe.id = "k80-print-frame";
+    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none";
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(
+      "<!doctype html><html><head><meta charset='utf-8'><title>Phiếu in K80</title><style>" +
+        "@page{size:80mm auto;margin:0}" +
+        "*{box-sizing:border-box}" +
+        "html,body{margin:0;padding:0;width:78mm;background:#fff;color:#000;font-family:'Be Vietnam Pro',Arial,sans-serif;font-size:12px;line-height:1.45;-webkit-print-color-adjust:exact;print-color-adjust:exact}" +
+        ".receipt{width:76mm;margin:0 auto;padding:3mm 2mm 6mm;color:#000;background:#fff}" +
+        ".r-center{text-align:center}" +
+        ".r-big{font-weight:700;font-size:14px}" +
+        ".r-huge{font-weight:800;font-size:20px;letter-spacing:.5px;margin:2px 0}" +
+        ".r-sep{border-top:1px dashed #000;margin:6px 0}" +
+        ".r-row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin:2px 0}" +
+        ".r-row span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}" +
+        ".r-qr{display:flex;justify-content:center;margin:6px 0}" +
+        ".r-qr svg{width:136px;height:136px}" +
+        ".small{font-size:11px}.muted{color:#222}" +
+        "</style></head><body>" +
+        html +
+        "</body></html>"
+    );
+    doc.close();
+    setTimeout(() => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (e) {
+        window.print();
+      }
+      setTimeout(() => {
+        try { iframe.remove(); } catch (e) {}
+      }, 4000);
+    }, 150);
+  };
+
+  App.printReceiptDoc = function (docObj) {
+    if (!docObj || !window.UI || !UI.receipt) return;
+    App.printReceiptHtml(UI.receipt(docObj));
+  };
+
+  App.stopCheckinCamera = function () {
+    if (App._ciStream) {
+      try {
+        App._ciStream.getTracks().forEach((t) => t.stop());
+      } catch (e) {}
+      App._ciStream = null;
+    }
+  };
+
+  // Hop thoai cham cong thuc te (kiem tra IP mang quan + GPS thuc + Camera truoc chup selfie)
+  App.openCheckinModal = function () {
+    const me = App.me();
+    if (!me) return;
+    App.stopCheckinCamera();
+    const st = {
+      netLoading: true,
+      clientIp: "",
+      netError: "",
+      gpsLoading: true,
+      gpsVerified: false,
+      gpsMeters: null,
+      lat: null,
+      lng: null,
+      gpsError: "",
+      camLoading: false,
+      camError: "",
+      selfieUrl: null,
+    };
+    App._ciState = st;
+
+    App._ciCheckNetwork = async function () {
+      st.netLoading = true;
+      st.netError = "";
+      App.render();
+      try {
+        const resp = await fetch((Store.apiBase || "") + "/api/client-info", { cache: "no-store" });
+        const data = await resp.json();
+        st.clientIp = (data && data.ip) || "local";
+      } catch (e) {
+        st.clientIp = location.hostname || "local";
+      }
+      st.netLoading = false;
+      App.render();
+    };
+
+    App._ciCheckGps = function () {
+      const cfg = Store.config.attendance || {};
+      if (!cfg.gpsRequired) {
+        st.gpsLoading = false;
+        st.gpsVerified = true;
+        st.gpsMeters = 0;
+        App.render();
+        return;
+      }
+      if (!navigator.geolocation) {
+        st.gpsLoading = false;
+        st.gpsVerified = false;
+        st.gpsError = "Trình duyệt trên thiết bị này không hỗ trợ định vị GPS.";
+        App.render();
+        return;
+      }
+      st.gpsLoading = true;
+      st.gpsError = "";
+      App.render();
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (App._ciState !== st) return;
+          st.lat = pos.coords.latitude;
+          st.lng = pos.coords.longitude;
+          st.gpsVerified = true;
+          st.gpsLoading = false;
+          const curCfg = Store.config.attendance || {};
+          const hasStore = curCfg.storeLat !== null && curCfg.storeLat !== undefined && curCfg.storeLat !== "" && curCfg.storeLng !== null && curCfg.storeLng !== undefined && curCfg.storeLng !== "";
+          st.gpsMeters = hasStore ? U.haversineMeters(st.lat, st.lng, curCfg.storeLat, curCfg.storeLng) : 0;
+          App.render();
+        },
+        (err) => {
+          if (App._ciState !== st) return;
+          st.gpsLoading = false;
+          st.gpsVerified = false;
+          st.gpsError = err && err.code === 1
+            ? "Bạn chưa cho phép quyền Vị trí (Location). Hãy bấm Cho phép trên trình duyệt rồi bấm Định vị lại."
+            : "Không lấy được tín hiệu GPS (" + ((err && err.message) || "hết thời gian chờ") + "). Hãy bật Định vị trên điện thoại rồi thử lại.";
+          App.render();
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    };
+
+    App._ciStartCamera = async function () {
+      const cfg = Store.config.attendance || {};
+      if (!cfg.selfieRequired || st.selfieUrl) return;
+      App.stopCheckinCamera();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        st.camError = "Trình duyệt chặn luồng video trực tiếp — hãy bấm nút Mở máy ảnh điện thoại bên dưới để chụp.";
+        App.render();
+        return;
+      }
+      st.camLoading = true;
+      st.camError = "";
+      App.render();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 } },
+          audio: false,
+        });
+        if (App._ciState !== st || !App._modal) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        App._ciStream = stream;
+        st.camLoading = false;
+        App.render();
+      } catch (e) {
+        if (App._ciState !== st) return;
+        st.camLoading = false;
+        st.camError = "Chưa mở được camera trực tiếp (" + ((e && e.message) || "chưa cấp quyền") + "). Bạn có thể bấm Mở máy ảnh điện thoại bên dưới để chụp.";
+        App.render();
+      }
+    };
+
+    const seg = Engine.segmentFor(me, Date.now());
+    App.modal({
+      title: "Chấm công vào ca",
+      sub: seg ? "Ca " + seg.seg.start + " – " + seg.seg.end : "Ngoài lịch ca cố định",
+      onClose: () => {
+        App.stopCheckinCamera();
+        App._ciState = null;
+      },
+      body: () => {
+        const cfg = Store.config.attendance || {};
+        const expectedIp = String(cfg.wifiIp || "").trim();
+        const netOk = !cfg.wifiRequired || (!!st.clientIp && (!expectedIp || st.clientIp === expectedIp));
+        const hasStoreCoords = cfg.storeLat !== null && cfg.storeLat !== undefined && cfg.storeLat !== "" && cfg.storeLng !== null && cfg.storeLng !== undefined && cfg.storeLng !== "";
+        const gpsOk = !cfg.gpsRequired || (st.gpsVerified && (!hasStoreCoords || (st.gpsMeters !== null && st.gpsMeters <= cfg.gpsRadius)));
+        const camOk = !cfg.selfieRequired || !!st.selfieUrl;
+
+        let netSub = "";
+        if (!cfg.wifiRequired) netSub = "Không bắt buộc kiểm tra mạng Wi-Fi";
+        else if (st.netLoading) netSub = "Đang kiểm tra địa chỉ mạng kết nối...";
+        else if (!st.clientIp) netSub = "Chưa xác định được địa chỉ mạng";
+        else if (expectedIp) {
+          netSub = netOk
+            ? "Đúng mạng Wi-Fi quán (" + esc(cfg.wifiName || "Wi-Fi quán") + " · IP " + esc(st.clientIp) + ")"
+            : "Đang dùng mạng khác (IP " + esc(st.clientIp) + " ≠ mạng quán " + esc(expectedIp) + ")";
+        } else {
+          netSub = "Đã ghi nhận IP mạng: " + esc(st.clientIp) + " (" + esc(cfg.wifiName || "Wi-Fi quán") + ")";
+        }
+
+        let gpsSub = "";
+        if (!cfg.gpsRequired) gpsSub = "Không bắt buộc định vị GPS";
+        else if (st.gpsLoading) gpsSub = "Đang lấy tọa độ GPS thực tế từ thiết bị...";
+        else if (st.gpsError) gpsSub = esc(st.gpsError);
+        else if (hasStoreCoords) {
+          gpsSub = "Cách tâm quán " + st.gpsMeters + " m (bán kính cho phép <= " + cfg.gpsRadius + " m)";
+        } else if (st.lat !== null) {
+          gpsSub = "Đã xác thực GPS (" + st.lat.toFixed(5) + ", " + st.lng.toFixed(5) + ")";
+        }
+
+        return (
+          '<div class="col gap-12">' +
+          '<div class="list" style="border:1px solid var(--line);border-radius:var(--r)">' +
+          '<div class="list-row">' +
+          I("wifi") +
+          '<div class="grow"><b>Mạng Wi-Fi quán</b><div class="meta">' + netSub + "</div></div>" +
+          UI.badge(st.netLoading ? "Đang đo" : netOk ? "Hợp lệ" : "Sai mạng", st.netLoading ? "neutral" : netOk ? "success" : "danger") +
+          UI.btn("Kiểm tra lại", { act: "app.ciRefreshNet", size: "sm" }) +
+          "</div>" +
+          '<div class="list-row">' +
+          I("map-pin") +
+          '<div class="grow"><b>Vị trí GPS tại quán</b><div class="meta">' + gpsSub + "</div></div>" +
+          UI.badge(st.gpsLoading ? "Đang định vị" : gpsOk ? "Hợp lệ" : "Chưa đạt", st.gpsLoading ? "neutral" : gpsOk ? "success" : "danger") +
+          UI.btn("Định vị lại", { act: "app.ciRefreshGps", size: "sm" }) +
+          "</div>" +
+          "</div>" +
+          (cfg.selfieRequired
+            ? '<div class="card card-pad col gap-8">' +
+              '<div class="row between"><b>Ảnh khuôn mặt xác thực trực tiếp</b>' +
+              UI.badge(camOk ? "Đã chụp" : "Bắt buộc", camOk ? "success" : "warning") +
+              "</div>" +
+              (st.selfieUrl
+                ? '<div class="col center gap-8">' +
+                  '<img src="' + st.selfieUrl + '" alt="Ảnh chấm công" style="width:100%;max-width:280px;border-radius:10px;border:2px solid var(--success);object-fit:cover">' +
+                  UI.btn("Chụp lại ảnh khác", { act: "app.ciRetake", icon: "camera", size: "sm" }) +
+                  "</div>"
+                : '<div class="col center gap-8">' +
+                  (App._ciStream
+                    ? '<video id="ci-live-video" autoplay playsinline muted style="width:100%;max-width:280px;border-radius:10px;background:#111;transform:scaleX(-1);aspect-ratio:4/3;object-fit:cover"></video>' +
+                      UI.btn("Chụp ảnh khuôn mặt", { act: "app.ciSnap", kind: "primary", icon: "camera", block: true })
+                    : '<div class="subtle small center" style="padding:12px 8px">' +
+                      esc(st.camLoading ? "Đang mở camera trước..." : st.camError || "Đang kết nối camera trước...") +
+                      "</div>") +
+                  '<div class="row gap-8 wrap center">' +
+                  (!App._ciStream && !st.camLoading ? UI.btn("Bật lại Camera", { act: "app.ciStartCam", icon: "video", size: "sm" }) : "") +
+                  '<label class="btn btn-sm" style="cursor:pointer">' +
+                  I("camera") +
+                  '<span>Mở máy ảnh điện thoại</span>' +
+                  '<input type="file" accept="image/*" capture="user" data-change="app.ciFileSelfie" class="hidden">' +
+                  "</label>" +
+                  "</div>" +
+                  "</div>") +
+              "</div>"
+            : "") +
+          "</div>"
+        );
+      },
+      foot: () => {
+        const cfg = Store.config.attendance || {};
+        const expectedIp = String(cfg.wifiIp || "").trim();
+        const netOk = !cfg.wifiRequired || (!!st.clientIp && (!expectedIp || st.clientIp === expectedIp));
+        const hasStoreCoords = cfg.storeLat !== null && cfg.storeLat !== undefined && cfg.storeLat !== "" && cfg.storeLng !== null && cfg.storeLng !== undefined && cfg.storeLng !== "";
+        const gpsOk = !cfg.gpsRequired || (st.gpsVerified && (!hasStoreCoords || (st.gpsMeters !== null && st.gpsMeters <= cfg.gpsRadius)));
+        const camOk = !cfg.selfieRequired || !!st.selfieUrl;
+        return (
+          UI.btn("Đóng", { act: "app.closeModal" }) +
+          UI.btn("Xác nhận vào ca", {
+            act: "app.ciSubmit",
+            kind: "primary",
+            icon: "check",
+            disabled: !(netOk && gpsOk && camOk),
+          })
+        );
+      },
+    });
+
+    App._ciCheckNetwork();
+    App._ciCheckGps();
+    App._ciStartCamera();
+  };
 
   /* ---------- Khoi dong ---------- */
   App.start = function () {

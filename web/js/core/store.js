@@ -149,7 +149,9 @@
         { id: "sh_late", name: "Ca khuya", segments: [{ start: "17:00", end: "01:00" }] },
       ],
       attendance: {
-        wifiRequired: true, wifiName: "PhoBien_Staff", gpsRequired: true, gpsRadius: 50, selfieRequired: true,
+        wifiRequired: true, wifiName: "PhoBien_Staff", wifiIp: "",
+        gpsRequired: true, gpsRadius: 50, storeLat: null, storeLng: null,
+        selfieRequired: true,
         graceMinutes: 5,
         latePenalties: [{ fromMin: 6, amount: 20000 }, { fromMin: 16, amount: 50000 }, { fromMin: 31, amount: 100000 }],
         cleanupBuffer: 30, nightStart: "22:00", nightMultiplier: 1.3, otMultiplier: 1.5,
@@ -215,14 +217,14 @@
       },
 
       printers: [
-        { id: "p_cashier", name: "Máy in quầy thu ngân", location: "Quầy", categories: [], purpose: "bill", copies: 1, online: true, backupId: "" },
-        { id: "p_kitchen", name: "Máy in bếp nóng", location: "Bếp", categories: ["c_quick", "c_hotpot"], purpose: "kitchen", copies: 1, online: true, backupId: "p_grill" },
-        { id: "p_grill", name: "Máy in bếp nướng", location: "Bếp nướng", categories: ["c_grill"], purpose: "kitchen", copies: 1, online: true, backupId: "p_kitchen" },
-        { id: "p_tank", name: "Máy in hồ cá", location: "Hồ hải sản", categories: ["c_sea"], purpose: "tag", copies: 2, online: true, backupId: "p_kitchen" },
-        { id: "p_bar", name: "Máy in quầy bar", location: "Quầy bar", categories: ["c_beer", "c_soft", "c_liquor"], purpose: "kitchen", copies: 1, online: true, backupId: "p_cashier" },
+        { id: "p_cashier", name: "Máy in quầy thu ngân", location: "Quầy", categories: [], purpose: "bill", copies: 1, online: true, backupId: "", ip: "", port: 9100 },
+        { id: "p_kitchen", name: "Máy in bếp nóng", location: "Bếp", categories: ["c_quick", "c_hotpot"], purpose: "kitchen", copies: 1, online: true, backupId: "p_grill", ip: "", port: 9100 },
+        { id: "p_grill", name: "Máy in bếp nướng", location: "Bếp nướng", categories: ["c_grill"], purpose: "kitchen", copies: 1, online: true, backupId: "p_kitchen", ip: "", port: 9100 },
+        { id: "p_tank", name: "Máy in hồ cá", location: "Hồ hải sản", categories: ["c_sea"], purpose: "tag", copies: 2, online: true, backupId: "p_kitchen", ip: "", port: 9100 },
+        { id: "p_bar", name: "Máy in quầy bar", location: "Quầy bar", categories: ["c_beer", "c_soft", "c_liquor"], purpose: "kitchen", copies: 1, online: true, backupId: "p_cashier", ip: "", port: 9100 },
       ],
       scale: { enabled: true, port: "COM3", stableMs: 800, tareKg: 0, decimals: 2 },
-      receipt: { showWifi: true, showQr: true, showVatNote: true, footer: "Quét mã QR để tự xuất hóa đơn VAT trong 24 giờ", copiesPrebill: 1 },
+      receipt: { showWifi: true, showQr: true, qrLockAmount: false, showVatNote: true, footer: "Quét mã QR để tự xuất hóa đơn VAT trong 24 giờ", copiesPrebill: 1 },
 
       tax: { pricesIncludeVat: true, food: 8, alcohol: 10, hkdRate: 4.5, mode: "hkd", einvoiceProvider: "Viettel S-Invoice", einvoiceWindowHours: 24 },
       theme: { posDark: false, kioskDark: false },
@@ -1079,6 +1081,16 @@
     const pWait = (cfg.permissions.waiter = Object.assign({}, def.permissions.waiter, cfg.permissions.waiter || {}));
     if (pWait.collectPayment === undefined) pWait.collectPayment = true;
     if (pWait.collectCash === undefined) pWait.collectCash = true;
+    cfg.receipt = cfg.receipt || {};
+    if (cfg.receipt.qrLockAmount === undefined) cfg.receipt.qrLockAmount = false;
+    cfg.attendance = cfg.attendance || {};
+    if (cfg.attendance.wifiIp === undefined) cfg.attendance.wifiIp = "";
+    if (cfg.attendance.storeLat === undefined) cfg.attendance.storeLat = null;
+    if (cfg.attendance.storeLng === undefined) cfg.attendance.storeLng = null;
+    (cfg.printers || []).forEach((pt) => {
+      if (pt.ip === undefined) pt.ip = "";
+      if (!pt.port) pt.port = 9100;
+    });
 
     const defaultWaiterAssign = {
       s_lan: { areas: ["ar_garden"], tables: ["t_A1", "t_A2", "t_A3", "t_A4", "t_A5", "t_A6"] },

@@ -1303,12 +1303,15 @@
     });
     const amt = Math.max(0, tot.due !== undefined ? tot.due : tot.grand - tot.deposit);
     const payCode = E.ensurePayCode(tk);
+    const lockQrAmt = !!(cfg.receipt && cfg.receipt.qrLockAmount);
     const doc = E.billDoc(tk, "prebill", {
       ticketId: tk.id,
       tableId: tk.tableId,
       tableCode: tblCode,
-      qr: cfg.receipt.showQr ? U.vietQr(cfg.store.bankBin, cfg.store.bankAccount, amt, payCode) : null,
-      qrLabel: "Quét VietQR · Nội dung định danh: " + payCode,
+      qr: cfg.receipt.showQr ? U.vietQr(cfg.store.bankBin, cfg.store.bankAccount, lockQrAmt ? amt : 0, payCode) : null,
+      qrLabel: lockQrAmt
+        ? "Quét VietQR · Nội dung định danh: " + payCode
+        : "Quét VietQR · Nhập >= " + U.money(amt) + " (nhập dư tính Tip) · Giữ nguyên ND: " + payCode,
     });
     E.print("p_cashier", doc);
     tk.prebillAt = now;
@@ -2014,7 +2017,7 @@
     });
     return best;
   };
-  // opts: {method:'mobile'|'kiosk', wifi:'PhoBien_Staff', gpsMeters: 12, selfie: true}
+  // opts: {method:'mobile'|'kiosk', clientIp, gpsVerified, gpsMeters, selfie, selfieUrl}
   E.checkIn = function (staffId, opts) {
     opts = opts || {};
     const st = E.staff(staffId);
@@ -2022,14 +2025,54 @@
     if (E.activeAtt(staffId)) fail("Bạn đang trong ca, chưa chấm công ra.");
     const cfg = C().attendance;
     if (opts.method === "mobile") {
-      if (cfg.wifiRequired && opts.wifi !== cfg.wifiName) fail("Chưa kết nối Wi-Fi của quán (" + cfg.wifiName + "). Hãy kết nối rồi thử lại.");
-      if (cfg.gpsRequired && !(opts.gpsMeters <= cfg.gpsRadius)) fail("Vị trí cách quán " + Math.round(opts.gpsMeters || 9999) + " m, vượt bán kính cho phép " + cfg.gpsRadius + " m.");
+      if (cfg.wifiRequired) {
+        const expectedIp = String(cfg.wifiIp || "").trim();
+        const curIp = String(opts.clientIp || "").trim();
+        if (!curIp) fail("Chưa kiểm tra được địa chỉ mạng hiện tại. Hãy bấm Kiểm tra lại mạng.");
+        if (expectedIp && curIp !== expectedIp) {
+          fail("Thiết bị đang dùng mạng khác (" + curIp + "), không khớp mạng Wi-Fi của quán (" + (cfg.wifiName || "Wi-Fi quán") + " · " + expectedIp + "). Hãy kết nối đúng Wi-Fi quán rồi thử lại.");
+        }
+      }
+      if (cfg.gpsRequired) {
+        if (!opts.gpsVerified) {
+          fail("Chưa xác thực được vị trí GPS từ điện thoại. Hãy bật Định vị (Location) cho trình duyệt rồi bấm Định vị lại.");
+        }
+        const hasStoreCoords = cfg.storeLat !== null && cfg.storeLat !== undefined && cfg.storeLat !== "" && cfg.storeLng !== null && cfg.storeLng !== undefined && cfg.storeLng !== "";
+        if (hasStoreCoords && !(opts.gpsMeters !== null && opts.gpsMeters !== undefined && opts.gpsMeters <= cfg.gpsRadius)) {
+          fail("Vị trí hiện tại cách quán " + Math.round(opts.gpsMeters || 9999) + " m, vượt bán kính cho phép " + cfg.gpsRadius + " m.");
+        }
+      }
+      if (cfg.selfieRequired && !opts.selfieUrl) {
+        fail("Cần chụp ảnh khuôn mặt trực tiếp bằng camera trước khi chấm công.");
+      }
+    } else {
+      if (cfg.selfieRequired && !opts.selfie && !opts.selfieUrl) {
+        fail("Cần chụp ảnh xác thực khi chấm công.");
+      }
     }
-    if (cfg.selfieRequired && !opts.selfie) fail("Cần chụp ảnh xác thực khi chấm công.");
     const now = opts.at || Date.now();
     const seg = E.segmentFor(st, now);
     const lateMin = seg ? Math.max(0, Math.round((now - seg.start) / MIN)) : 0;
-    const rec = { id: U.uid("att"), staffId, dayKey: U.dayKey(now), segment: seg ? seg.i : 0, shiftId: st.shiftId, in: now, out: null, method: opts.method || "kiosk", lateMin, selfie: !!opts.selfie, otPendingMin: 0, otApprovedMin: 0, otAutoMin: 0, otStatus: "none", offSchedule: !seg };
+    const rec = {
+      id: U.uid("att"),
+      staffId,
+      dayKey: U.dayKey(now),
+      segment: seg ? seg.i : 0,
+      shiftId: st.shiftId,
+      in: now,
+      out: null,
+      method: opts.method || "kiosk",
+      lateMin,
+      selfie: !!(opts.selfieUrl || opts.selfie),
+      selfieUrl: opts.selfieUrl || null,
+      gpsMeters: opts.gpsMeters !== undefined && opts.gpsMeters !== null ? Math.round(opts.gpsMeters) : null,
+      clientIp: opts.clientIp || null,
+      otPendingMin: 0,
+      otApprovedMin: 0,
+      otAutoMin: 0,
+      otStatus: "none",
+      offSchedule: !seg,
+    };
     D().attendance.push(rec);
     return { rec, penalty: E.latePenalty(lateMin), seg };
   };

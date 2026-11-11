@@ -135,14 +135,20 @@
   UI.qrBox = function (o) {
     o = o || {};
     const s = Store.config.store || {};
-    const payload = U.vietQr(s.bankBin || "970436", s.bankAccount || "00000000", o.amount || 0, o.memo || "");
+    const rc = Store.config.receipt || {};
+    const lockAmt = o.lockAmount !== undefined ? !!o.lockAmount : !!rc.qrLockAmount;
+    const qrAmt = lockAmt ? (o.amount || 0) : 0;
+    const payload = U.vietQr(s.bankBin || "970436", s.bankAccount || "00000000", qrAmt, o.memo || "");
     return '<div class="qr-box">' +
       (o.caption ? '<div class="small strong">' + esc(o.caption) + "</div>" : "") +
       U.qrSvg(payload, o.size || 168) +
       '<div class="qr-bank"><b>' + esc(s.bankName || s.bankBin || "Ngân hàng") + " · " + esc(s.bankAccount || "") + "</b>" +
       "<div>" + esc(s.accountName || s.bankHolder || "") + "</div>" +
-      '<div class="strong num text-primary" style="font-size:15px;margin-top:4px">' + U.money(o.amount || 0) + "</div>" +
-      (o.memo ? '<div class="mt-4"><span class="badge badge-info">Nội dung CK: <b>' + esc(o.memo) + "</b></span></div>" : "") +
+      '<div class="strong num text-primary" style="font-size:15px;margin-top:4px">' + (lockAmt ? "" : "Cần thanh toán: ") + U.money(o.amount || 0) + "</div>" +
+      (!lockAmt && (o.amount || 0) > 0
+        ? '<div class="small text-success mt-4">Ô số tiền để mở tự do — khách nhập &ge; ' + U.money(o.amount || 0) + " (nhập dư tự tính Tiền Tip)</div>"
+        : "") +
+      (o.memo ? '<div class="mt-4"><span class="badge badge-info">Nội dung CK cố định: <b>' + esc(o.memo) + "</b></span></div>" : "") +
       "</div></div>";
   };
 

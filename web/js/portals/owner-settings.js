@@ -232,16 +232,20 @@
     /* ---------- 5. Ca lam va luong ---------- */
     { id: "shiftlist", group: "shifts", title: "Ca làm", desc: "Một ca có thể gồm nhiều mốc giờ (ca gãy). Ca qua nửa đêm được tính cho ngày bắt đầu.", render: () => shiftsCard(), keywords: "ca làm ca gãy mốc giờ ca tối ca khuya" },
     {
-      id: "attendance", group: "shifts", title: "Chấm công và đi trễ", desc: "Điều kiện để nhân viên chấm công bằng điện thoại.",
+      id: "attendance", group: "shifts", title: "Chấm công và đi trễ", desc: "Điều kiện xác thực thực tế (IP mạng Wi-Fi quán, tọa độ GPS thật, camera trước chụp khuôn mặt) để nhân viên chấm công bằng điện thoại.",
       fields: [
-        f("attendance.wifiRequired", "bool", "Bắt buộc kết nối Wi-Fi của quán", "Điện thoại nhân viên phải kết nối đúng mạng Wi-Fi bên dưới khi chấm công."),
-        f("attendance.wifiName", "text", "Tên Wi-Fi chấm công", "Nhập chính xác tên mạng, phân biệt chữ hoa và chữ thường.", { required: true, placeholder: "Ví dụ: PhoBien_Staff" }),
-        f("attendance.gpsRequired", "bool", "Kiểm tra vị trí GPS", "Chỉ cho chấm công khi điện thoại ở trong bán kính quanh quán."),
-        f("attendance.gpsRadius", "int", "Bán kính cho phép", "Khoảng cách tối đa từ quán đến vị trí chấm công.", { unit: "m", min: 10, max: 500 }),
-        f("attendance.selfieRequired", "bool", "Chụp ảnh khuôn mặt khi chấm công", "Chống chấm công hộ. Ảnh được lưu kèm bản ghi chấm công."),
+        f("attendance.wifiRequired", "bool", "Bắt buộc kết nối Wi-Fi của quán", "Điện thoại nhân viên phải kết nối đúng mạng Wi-Fi của quán khi chấm công."),
+        f("attendance.wifiName", "text", "Tên Wi-Fi chấm công", "Tên mạng hiển thị cho nhân viên biết cần bắt Wi-Fi nào.", { required: true, placeholder: "Ví dụ: PhoBien_Staff" }),
+        f("attendance.wifiIp", "text", "Địa chỉ IP mạng Wi-Fi quán (chống giả mạo tên Wi-Fi)", "Bấm nút Gắn IP Wi-Fi hiện tại ở khung bên cạnh khi đang bắt Wi-Fi của quán. Để trống nếu mạng quán đổi IP động liên tục.", { placeholder: "VD: 14.161.22.88" }),
+        f("attendance.gpsRequired", "bool", "Kiểm tra vị trí GPS thực tế", "Chỉ cho chấm công khi điện thoại ở trong bán kính quanh tọa độ tâm quán."),
+        f("attendance.gpsRadius", "int", "Bán kính cho phép", "Khoảng cách tối đa từ tâm quán đến vị trí chấm công.", { unit: "m", min: 10, max: 500 }),
+        f("attendance.storeLat", "text", "Vĩ độ GPS tâm quán (Latitude)", "Bấm nút Lấy tọa độ GPS hiện tại ở khung bên cạnh khi đang đứng tại quán.", { placeholder: "VD: 10.776889" }),
+        f("attendance.storeLng", "text", "Kinh độ GPS tâm quán (Longitude)", "Kết hợp cùng Vĩ độ để đo khoảng cách thực tế từng mét.", { placeholder: "VD: 106.700897" }),
+        f("attendance.selfieRequired", "bool", "Chụp ảnh khuôn mặt trực tiếp bằng Camera trước", "Bắt buộc mở camera trước chụp ảnh thật khi chấm công (lưu ảnh vào Nhật ký chấm công của Chủ quán)."),
         f("attendance.graceMinutes", "int", "Số phút cho phép đi trễ", "Đi trễ trong số phút này không bị phạt.", { unit: "phút", min: 0, max: 60 }),
         f("attendance.latePenalties", "tiers", "Bậc tiền phạt đi trễ", "Mỗi bậc áp dụng từ số phút trễ đã nhập. Xóa hết các bậc để tắt phạt đi trễ."),
       ],
+      side: (d) => attGeoHelperCard(d),
       example: (d) => exLate(d),
     },
     {
@@ -295,7 +299,7 @@
       ],
     },
     {
-      id: "bank", group: "printers", title: "Tài khoản nhận VietQR", desc: "Mã QR trên phiếu tạm tính tự điền đúng số tiền và nội dung bàn.",
+      id: "bank", group: "printers", title: "Tài khoản nhận VietQR", desc: "Mã QR thanh toán giữ cố định nội dung mã bàn và mở tự do ô số tiền để khách có thể cộng thêm Tiền Tip.",
       fields: [
         f("store.bankBin", "select", "Ngân hàng", "Ngân hàng nhận tiền chuyển khoản của khách.", { options: BANKS.map((b) => ({ value: b.bin, label: b.name + " (" + b.bin + ")" })) }),
         f("store.bankAccount", "text", "Số tài khoản", "Chỉ gồm chữ số, 6 đến 19 số.", { required: true, inputmode: "numeric" }),
@@ -322,6 +326,7 @@
       fields: [
         f("receipt.showWifi", "bool", "In tên và mật khẩu Wi-Fi", "Dòng Wi-Fi in ở cuối phiếu tạm tính và hóa đơn."),
         f("receipt.showQr", "bool", "In mã QR trên bill", "Phiếu tạm tính in VietQR chuyển khoản; hóa đơn in mã tra cứu xuất hóa đơn VAT."),
+        f("receipt.qrLockAmount", "bool", "Khóa cố định số tiền trong mã VietQR thanh toán", "Mặc định TẮT: ô số tiền trên App ngân hàng để mở tự do (khách tự nhập >= tiền bill để cộng thêm Tiền Tip), còn Nội dung CK luôn khóa cứng theo mã định danh bàn."),
         f("receipt.showVatNote", "bool", "In dòng thuế GTGT đã gồm trong giá", "Chỉ áp dụng khi giá bán đã gồm thuế GTGT."),
         f("receipt.footer", "text", "Dòng chú thích dưới mã QR hóa đơn", "Hướng dẫn khách quét mã để tự xuất hóa đơn VAT.", { maxlength: 90 }),
       ],
@@ -1006,6 +1011,21 @@
       (summary.length ? '<div class="tier-sum">' + summary.map((x) => "<span>" + esc(x) + "</span>").join("") + "</div>" : "") + "</div>";
   }
 
+  function attGeoHelperCard(d) {
+    const a = (d && d.attendance) || {};
+    const hasCoords = a.storeLat !== null && a.storeLat !== undefined && String(a.storeLat).trim() !== "" && a.storeLng !== null && a.storeLng !== undefined && String(a.storeLng).trim() !== "";
+    return (
+      '<div class="set-preview-card col gap-8">' +
+      '<div class="strong small">Thiết lập nhanh tại quán (1 chạm)</div>' +
+      '<div class="small muted">Đứng tại quán, kết nối điện thoại/máy tính vào đúng Wi-Fi của quán rồi bấm 2 nút dưới đây để khóa chuẩn mạng và vị trí chấm công:</div>' +
+      UI.btn("Gắn IP Wi-Fi hiện tại làm mạng quán", { act: "settings.bindCurrentIp", icon: "wifi", size: "sm" }) +
+      (a.wifiIp ? '<div class="small text-success">Đang khóa IP mạng quán: <b>' + esc(a.wifiIp) + "</b></div>" : '<div class="small muted">Chưa khóa cứng IP (vẫn lưu log IP nhân viên).</div>') +
+      UI.btn("Lấy tọa độ GPS hiện tại làm vị trí quán", { act: "settings.bindCurrentGps", icon: "map-pin", size: "sm" }) +
+      (hasCoords ? '<div class="small text-success">Tâm quán: <b>' + esc(a.storeLat) + ", " + esc(a.storeLng) + "</b> (bán kính " + (a.gpsRadius || 50) + " m)</div>" : '<div class="small muted">Chưa khóa tâm tọa độ GPS (bắt buộc bật GPS thiết bị khi chấm công).</div>') +
+      "</div>"
+    );
+  }
+
   const CARD = {};
   CARDS.forEach((c) => (CARD[c.id] = c));
 
@@ -1098,15 +1118,27 @@
       return "<tr>" +
         "<td>" + inp(k + ".name", "text", { cls: "input-sm", aria: "Tên máy in" }) + "</td>" +
         "<td>" + inp(k + ".location", "text", { cls: "input-sm", aria: "Vị trí đặt" }) + "</td>" +
-        '<td style="width:140px">' + sel(k + ".purpose", opts(PURPOSE), { cls: "input-sm", aria: "Công dụng" }) + "</td>" +
-        '<td style="width:95px">' + inp(k + ".copies", "int", { cls: "input-sm", aria: "Số liên" }) + "</td>" +
-        '<td style="width:180px">' + sel(k + ".backupId", bkOpts, { cls: "input-sm", aria: "Máy dự phòng" }) + "</td>" +
+        '<td style="width:140px">' + inp(k + ".ip", "text", { cls: "input-sm", aria: "IP LAN máy in", placeholder: "192.168.1.201" }) + "</td>" +
+        '<td style="width:82px">' + inp(k + ".port", "int", { cls: "input-sm", aria: "Cổng TCP" }) + "</td>" +
+        '<td style="width:135px">' + sel(k + ".purpose", opts(PURPOSE), { cls: "input-sm", aria: "Công dụng" }) + "</td>" +
+        '<td style="width:80px">' + inp(k + ".copies", "int", { cls: "input-sm", aria: "Số liên" }) + "</td>" +
+        '<td style="width:165px">' + sel(k + ".backupId", bkOpts, { cls: "input-sm", aria: "Máy dự phòng" }) + "</td>" +
         '<td class="center">' + sw(k + ".online", { aria: "Kết nối " + p.name }) + "</td>" +
         '<td class="right">' + UI.iconBtn("printer", { act: "settings.printerTest", data: { id: p.id }, title: "In thử " + p.name }) + UI.iconBtn("trash-2", { act: "settings.printerDel", data: { id: p.id }, title: "Xóa máy in" }) + "</td></tr>";
     }).join("");
+    const guide =
+      '<div class="banner banner-info mb-12">' +
+      I("printer") +
+      '<div><b>Kết nối máy in nhiệt K80 tự động (Bếp chỉ cần cắm 1 máy in mạng LAN là tự động in):</b> Điền địa chỉ <b>IP LAN</b> cố định của từng máy in nhiệt (ví dụ <code>192.168.1.201</code>, cổng chuẩn <code>9100</code>) rồi mở tệp <code>CHAY_KET_NOI_MAY_IN_LAN.bat</code> trên máy tính Thu ngân. Khi Phục vụ gửi món hoặc Hồ cá cân xong, máy in Bếp tự động cắt giấy in ngay mà Bếp không cần bấm gì.</div>' +
+      "</div>";
     return cardShell(CARD.printers,
-      '<div class="table-wrap set-list"><table class="dt"><thead><tr><th>Tên máy in</th><th>Vị trí</th><th>Công dụng</th><th>Số liên</th><th>Máy dự phòng</th><th class="center">Kết nối</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>",
-      { errs: errsUnder("printers"), head: UI.btn("Thêm máy in", { act: "settings.printerAdd", icon: "plus", size: "sm" }) }
+      guide + '<div class="table-wrap set-list"><table class="dt"><thead><tr><th>Tên máy in</th><th>Vị trí</th><th>IP LAN</th><th>Cổng</th><th>Công dụng</th><th>Số liên</th><th>Máy dự phòng</th><th class="center">Kết nối</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>",
+      {
+        errs: errsUnder("printers"),
+        head:
+          '<a class="btn btn-sm" href="/api/print-agent/download" download="QuanNhau_MayIn_LAN.zip">' + I("download", "ic-sm") + " Tải bộ kết nối máy in LAN (.zip)</a>" +
+          UI.btn("Thêm máy in", { act: "settings.printerAdd", icon: "plus", size: "sm" }),
+      }
     );
   }
 
@@ -1122,16 +1154,24 @@
       }).join("");
       return "<tr><td><b>" + esc(c.name) + '</b><div class="small muted">' + esc(CAT_KIND[c.kind] || c.kind) + "</div></td>" + cells + "</tr>";
     }).join("");
-    return cardShell(CARD.routing, '<div class="table-wrap set-list"><table class="dt"><thead><tr>' + head + "</tr></thead><tbody>" + rows + "</tbody></table></div>");
+    return cardShell(
+      CARD.routing,
+      '<div class="table-wrap set-list"><table class="dt"><thead><tr>' + head + "</tr></thead><tbody>" + rows + "</tbody></table></div>",
+      { head: UI.btn("Chế độ 1 máy in Bếp duy nhất (Gộp mọi món ăn về Bếp)", { act: "settings.singleKitchenMode", icon: "check-check", size: "sm" }) }
+    );
   }
 
   function qrPreview(d) {
     const s = d.store || {};
+    const rc = d.receipt || {};
+    const lockAmt = !!rc.qrLockAmount;
     const bank = BANKS.find((b) => b.bin === s.bankBin);
-    const payload = U.vietQr({ bin: s.bankBin || "970436", account: s.bankAccount || "00000000", amount: 500000, memo: "BAN T01" });
-    return '<div class="qr-box"><div class="small strong">Xem trước mã VietQR</div>' +
+    const payload = U.vietQr({ bin: s.bankBin || "970436", account: s.bankAccount || "00000000", amount: lockAmt ? 500000 : 0, memo: "QN A01 DEMO" });
+    return '<div class="qr-box"><div class="small strong">Xem trước mã VietQR thanh toán</div>' +
       U.qrSvg(payload, 168) +
-      '<div class="qr-bank"><b>' + esc(bank ? bank.name : s.bankBin) + " · " + esc(s.bankAccount || "") + "</b><div>" + esc(s.accountName || "") + '</div><div class="muted">Mẫu: 500.000 đ · BAN T01</div></div></div>';
+      '<div class="qr-bank"><b>' + esc(bank ? bank.name : s.bankBin) + " · " + esc(s.bankAccount || "") + "</b><div>" + esc(s.accountName || "") + "</div>" +
+      '<div class="small text-success mt-4">' + (lockAmt ? "Đang khóa cứng số tiền: 500.000 đ" : "Ô số tiền mở tự do (khách nhập >= bill để cộng Tip)") + "</div>" +
+      '<div class="muted small">Nội dung cố định: <b>QN A01 DEMO</b></div></div></div>';
   }
 
   function billPreview(d) {
@@ -1187,12 +1227,18 @@
         lines.push({ t: "center", text: "(Đã gồm thuế GTGT đồ ăn " + tax.food + "%, bia " + tax.alcohol + "%)" });
       }
       if (rc.showQr) {
+        const lockAmt = !!rc.qrLockAmount;
         const qr = kind === "prebill"
-          ? U.vietQr({ bin: s.bankBin || "970436", account: s.bankAccount || "00000000", amount: 2905000, memo: "BAN T02" })
+          ? U.vietQr({ bin: s.bankBin || "970436", account: s.bankAccount || "00000000", amount: lockAmt ? 2905000 : 0, memo: "QN T02 8491" })
           : ((typeof location !== "undefined" && /^https?:/.test(location.protocol) ? location.origin : "https://munbao.com") + "/customer?inv=HD261104");
         lines.push(
           { t: "sep" },
-          { t: "center", text: kind === "prebill" ? "Quét mã VietQR để chuyển khoản" : (rc.footer || "Quét mã để xuất hóa đơn VAT trong 24h") },
+          {
+            t: "center",
+            text: kind === "prebill"
+              ? (lockAmt ? "Quét VietQR · ND: QN T02 8491" : "Quét VietQR · Nhập >= 2.905.000 đ (dư tính Tip) · ND: QN T02 8491")
+              : (rc.footer || "Quét mã để xuất hóa đơn VAT trong 24h"),
+          },
           { t: "qr", data: qr }
         );
       }
@@ -1759,9 +1805,46 @@
       App.render();
     },
 
+    /* ---- Chấm công 1 chạm ---- */
+    "settings.bindCurrentIp": async () => {
+      try {
+        const resp = await fetch((Store.apiBase || "") + "/api/client-info", { cache: "no-store" });
+        const out = await resp.json();
+        if (out && out.ip) {
+          draft().attendance.wifiIp = String(out.ip).trim();
+          validate(draft());
+          App.toast("Đã điền IP mạng hiện tại (" + out.ip + ") vào cài đặt Chấm công. Nhớ bấm Lưu và áp dụng!", "success");
+          App.render();
+        } else {
+          App.toast("Chưa đọc được IP mạng hiện tại.", "warning");
+        }
+      } catch (e) {
+        App.toast("Không kết nối được máy chủ để lấy IP: " + e.message, "error");
+      }
+    },
+    "settings.bindCurrentGps": () => {
+      if (!navigator.geolocation) {
+        App.toast("Trình duyệt này không hỗ trợ lấy tọa độ GPS.", "error");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          draft().attendance.storeLat = pos.coords.latitude.toFixed(6);
+          draft().attendance.storeLng = pos.coords.longitude.toFixed(6);
+          validate(draft());
+          App.toast("Đã lấy tọa độ tâm quán (" + draft().attendance.storeLat + ", " + draft().attendance.storeLng + "). Nhớ bấm Lưu và áp dụng!", "success");
+          App.render();
+        },
+        (err) => {
+          App.toast("Chưa lấy được GPS (" + ((err && err.message) || "chưa cấp quyền Vị trí") + "). Hãy bật Cho phép Vị trí trên trình duyệt.", "error");
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    },
+
     /* ---- Máy in & mẫu bill ---- */
     "settings.printerAdd": () => {
-      draft().printers.push({ id: U.uid("p"), name: "Máy in mới", location: "Quầy", purpose: "kitchen", copies: 1, online: true, backupId: "", categories: [] });
+      draft().printers.push({ id: U.uid("p"), name: "Máy in mới", location: "Quầy", purpose: "kitchen", copies: 1, online: true, backupId: "", ip: "", port: 9100, categories: [] });
       App.render();
     },
     "settings.printerDel": (d) => {
@@ -1771,7 +1854,44 @@
     "settings.printerTest": (d) => {
       const p = draft().printers.find((x) => x.id === d.id);
       if (!p) return;
-      App.toast(p.online ? "Đã gửi phiếu in thử tới " + p.name : p.name + " đang mất kết nối, chuyển sang máy dự phòng", p.online ? "success" : "warning");
+      const testDoc = {
+        kind: "kitchen",
+        title: "PHIẾU IN THỬ KẾT NỐI",
+        big: p.name,
+        header: [draft().store.name || "QUÁN NHẬU"],
+        rows: [
+          { l: "Máy in: " + p.name, bold: true },
+          { l: "Vị trí: " + (p.location || "-") },
+          { l: "IP LAN: " + (p.ip ? p.ip + ":" + (p.port || 9100) : "Chưa nhập IP LAN") },
+        ],
+        footer: ["In thử lúc " + U.dateTime(Date.now())],
+      };
+      App.commit(() => Engine.print(p.id, testDoc), null, "In thử máy in " + p.name);
+      App.toast(
+        p.online
+          ? "Đã đẩy lệnh in thử tới " + p.name + (p.ip ? " (IP " + p.ip + ":" + (p.port || 9100) + ")" : "")
+          : p.name + " đang tắt kết nối, đã chuyển sang máy dự phòng",
+        p.online ? "success" : "warning"
+      );
+    },
+    "settings.singleKitchenMode": () => {
+      const d = draft();
+      const foodCats = d.categories.filter((c) => c.kind !== "drink" && c.kind !== "beer").map((c) => c.id);
+      const mainKitchen = d.printers.find((p) => p.id === "p_kitchen") || d.printers.find((p) => p.purpose === "kitchen");
+      if (!mainKitchen) {
+        App.toast("Chưa có máy in Bếp nào trong danh sách.", "error");
+        return;
+      }
+      d.printers.forEach((p) => {
+        if (p.id === mainKitchen.id) {
+          p.online = true;
+          p.categories = foodCats.slice();
+        } else if (p.purpose === "kitchen" && p.id !== "p_bar") {
+          p.categories = [];
+        }
+      });
+      App.toast("Đã gộp toàn bộ nhóm món ăn về 1 máy in duy nhất: " + mainKitchen.name + ". Bấm Lưu và áp dụng để hoàn tất!", "success");
+      App.render();
     },
     "settings.routeToggle": (d, el) => {
       const p = draft().printers.find((x) => x.id === d.printer);

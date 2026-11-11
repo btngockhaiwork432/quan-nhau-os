@@ -666,7 +666,7 @@
             ? "Chia đều toàn ca phục vụ (" + onDutyW.length + " người trong ca)"
             : "Chia đều toàn ca phục vụ (0 người trong ca → về người đứng bàn)";
           pane = '<div class="grid-2">' +
-            UI.qrBox({ amount: grand, memo: payCode, caption: "Quét VietQR tự điền số tiền & mã định danh " + payCode }) +
+            UI.qrBox({ amount: grand, memo: payCode, caption: "Quét VietQR — Nội dung cố định " + payCode + ", số tiền mở tự do (nhận Tip)" }) +
             '<div class="col gap-12">' +
             '<div class="row between"><span class="muted">Số tiền cần thanh toán</span><b class="big-amount num" style="font-size:26px">' + U.money(grand) + "</b></div>" +
             '<div class="chips">' +
@@ -698,7 +698,7 @@
             '<div class="col gap-12">' +
             UI.field("Phần trả bằng Tiền mặt (đ)", UI.input({ type: "number", model: "cashier.splitCash", live: true, value: cashPart })) +
             '<div class="field"><label>Phần còn lại chuyển khoản VietQR</label><div class="big-amount num text-primary" style="font-size:26px">' + U.money(qrPart) + "</div></div></div>" +
-            UI.qrBox({ amount: qrPart, memo: payCode, caption: "VietQR cho phần chuyển khoản (" + payCode + ")" }) +
+            UI.qrBox({ amount: qrPart, memo: payCode, caption: "VietQR phần chuyển khoản — Nội dung cố định " + payCode }) +
             "</div>";
         } else {
           const n = Math.max(1, Number(s.evenPeople) || 2);
@@ -1081,11 +1081,37 @@
     });
   }
 
+  const AUTO_PRINT_KEY = "quannhau_cashier_autoprint";
+  const _seenPrintIds = new Set();
+  let _seenInitialized = false;
+  function isAutoPrintOn() {
+    try { return localStorage.getItem(AUTO_PRINT_KEY) === "1"; } catch (e) { return false; }
+  }
+  function syncAutoPrintWatcher() {
+    const list = D().printLog || [];
+    if (!_seenInitialized) {
+      list.forEach((p) => _seenPrintIds.add(p.id));
+      _seenInitialized = true;
+      return;
+    }
+    const fresh = [];
+    list.forEach((p) => {
+      if (!_seenPrintIds.has(p.id)) {
+        _seenPrintIds.add(p.id);
+        if (!p.failed && Date.now() - (p.at || 0) < 30000) fresh.push(p);
+      }
+    });
+    if (isAutoPrintOn() && fresh.length && App.current === P) {
+      App.printReceiptDoc(fresh[0]);
+    }
+  }
+
   /* =====================================================================
      DANG KY PORTAL THU NGAN
      ===================================================================== */
   App.portal(P, {
     render() {
+      syncAutoPrintWatcher();
       const sh = Engine.currentShift();
       const autoLocked = sh && sh.status === "auto_locked";
       const closed = !sh || sh.status === "closed";
@@ -1998,14 +2024,31 @@
       App.commit(() => { Engine.payAdvance(d.id, App.me().id); return true; }, "Đã chi tiền mặt ứng lương cho nhân viên");
       App.render();
     },
+    "cashier.toggleAutoPrint": () => {
+      const next = !isAutoPrintOn();
+      try { localStorage.setItem(AUTO_PRINT_KEY, next ? "1" : "0"); } catch (e) {}
+      App.toast(next ? "Đã bật Tự động in K80 trên trình duyệt máy này." : "Đã tắt Tự động in K80 trên trình duyệt máy này.", "info");
+      App.render();
+    },
     "cashier.printLog": () => {
-      const logs = D().printLog.slice(0, 12);
       App.modal({
         title: "Nhật ký lệnh in nhiệt K80 (" + D().printLog.length + ")",
         size: "lg",
-        body: () => logs.length
-          ? '<div class="print-log">' + logs.map((p, idx) => '<div class="col gap-4"><div class="row between items-center small muted"><span>' + U.dateTime(p.at) + " · " + esc(p.printerName || "") + (p.rerouted ? " (Chuyển dự phòng từ " + esc(p.rerouted) + ")" : "") + (p.superseded ? ' <span class="badge badge-danger">HẾT HIỆU LỰC</span>' : "") + "</span>" + UI.btn("In lại K80", { size: "xs", icon: "printer", act: "app.printK80", data: { idx } }) + "</div>" + UI.receipt(p) + "</div>").join("") + "</div>"
-          : UI.empty("printer", "Chưa có lệnh in nào"),
+        body: () => {
+          const logs = D().printLog.slice(0, 12);
+          const autoOn = isAutoPrintOn();
+          return (
+            '<div class="card card-pad mb-12" style="background:var(--surface-2)">' +
+              '<div class="row between wrap gap-8">' +
+                '<div><b>Tự động gọi lệnh in K80 trên máy tính Thu ngân này</b><div class="small muted">Dành cho máy cắm cáp USB trực tiếp (mở Chrome chế độ <code>--kiosk-printing</code>). Với máy in mạng LAN ở Bếp/Hồ cá, hãy chạy bộ <code>quannhau_print_bridge</code> để in ngầm tự động không cần mở trình duyệt.</div></div>' +
+                UI.btn(autoOn ? "Đang BẬT tự động in" : "Đang TẮT tự động in", { size: "sm", kind: autoOn ? "success" : "", icon: "printer", act: "cashier.toggleAutoPrint" }) +
+              "</div>" +
+            "</div>" +
+            (logs.length
+              ? '<div class="print-log">' + logs.map((p, idx) => '<div class="col gap-4"><div class="row between items-center small muted"><span>' + U.dateTime(p.at) + " · " + esc(p.printerName || "") + (p.rerouted ? " (Chuyển dự phòng từ " + esc(p.rerouted) + ")" : "") + (p.superseded ? ' <span class="badge badge-danger">HẾT HIỆU LỰC</span>' : "") + "</span>" + UI.btn("In lại K80", { size: "xs", icon: "printer", act: "app.printK80", data: { idx } }) + "</div>" + UI.receipt(p) + "</div>").join("") + "</div>"
+              : UI.empty("printer", "Chưa có lệnh in nào"))
+          );
+        },
         foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
       });
     },

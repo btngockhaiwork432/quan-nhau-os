@@ -42,14 +42,18 @@ def main():
     ssh.connect(HOST, port=PORT, username=USER, password=PASS, timeout=20)
     sftp = ssh.open_sftp()
 
-    print("1. Uploading backend/ and web/ to /opt/quan_nhau ...")
+    print("1. Uploading backend/, web/, and print_agent/ to /opt/quan_nhau ...")
     upload_dir(sftp, os.path.join(LOCAL_ROOT, "backend"), f"{REMOTE_ROOT}/backend")
     upload_dir(sftp, os.path.join(LOCAL_ROOT, "web"), f"{REMOTE_ROOT}/web")
+    if os.path.isdir(os.path.join(LOCAL_ROOT, "print_agent")):
+        upload_dir(sftp, os.path.join(LOCAL_ROOT, "print_agent"), f"{REMOTE_ROOT}/print_agent")
     sftp.close()
 
     cmds = [
         "docker cp /opt/quan_nhau/web/. quannhau-app:/app/web/",
         "docker cp /opt/quan_nhau/backend/. quannhau-app:/app/backend/",
+        "docker exec quannhau-app mkdir -p /app/print_agent",
+        "docker cp /opt/quan_nhau/print_agent/. quannhau-app:/app/print_agent/",
         "docker restart quannhau-app",
         "sleep 3",
         "curl -s http://127.0.0.1:8765/api/health",

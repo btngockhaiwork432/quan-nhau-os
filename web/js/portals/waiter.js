@@ -88,8 +88,8 @@
       return '<div class="line ' + (it.status === "void" ? "void" : "") + '"><span class="l-qty">' + (m && m.kind === "seafood" ? "" : it.qty + "x") + '</span><div class="l-name"><div class="strong">' + esc(it.name) + '</div><div class="l-note">' + esc([Engine.itemLabel(it), it.sentAt ? U.time(it.sentAt) : ""].filter(Boolean).join(" · ")) + "</div></div>" + '<div class="col" style="align-items:flex-end;gap:4px">' + (canTotal ? '<span class="l-amt">' + (it.status === "pending_weigh" ? "--" : U.moneyPlain(Engine.itemAmount(it))) + "</span>" : "") + '<div class="row gap-4">' + retBtn + badge + "</div></div></div>";
     };
     return '<div class="row between"><button class="btn btn-ghost" data-act="waiter.back">' + I("chevron-left") + "Sơ đồ bàn</button>" + UI.badge(Engine.STATUS_LABEL[status.status], status.status === "locked" ? "danger" : status.status === "weigh" ? "warning" : "primary", true) + "</div>" +
-      '<div class="card card-pad"><div class="row between"><div><h2 style="font-size:24px">' + esc(table.code) + '</h2><div class="muted small">' + tk.guests + " khách · vào lúc " + U.time(tk.openedAt) + " · " + UI.since(tk.openedAt) + "</div></div>" +
-      (canTotal ? '<div class="right"><div class="muted small">Cần thanh toán</div><div class="strong num" style="font-size:20px">' + U.money(need) + "</div></div>" : "") + "</div>" +
+      '<div class="card card-pad"><div class="row between gap-8"><div><h2 style="font-size:24px">' + esc(table.code) + '</h2><div class="muted small">' + tk.guests + " khách · vào lúc " + U.time(tk.openedAt) + " · " + UI.since(tk.openedAt) + "</div></div>" +
+      (canTotal ? '<div class="right" style="flex-shrink:0"><div class="muted small">Cần thanh toán</div><div class="strong num" style="font-size:20px;white-space:nowrap">' + U.money(need) + "</div></div>" : "") + "</div>" +
       '<div class="row between wrap gap-8 mt-8">' +
         '<div class="row gap-6 wrap">' +
           UI.badge("Đứng bàn: " + waiterName, tk.waiterId === me.id ? "success" : "info") +
@@ -504,26 +504,6 @@
           "</div>";
       },
       foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
-    });
-  }
-
-  function checkinModal(me) {
-    const cfg = Store.config.attendance;
-    const st = S();
-    const c = (st._ci = { wifi: true, gps: 18, shot: false, flash: false });
-    App.modal({
-      title: "Chấm công vào ca",
-      sub: U.weekday(Date.now()) + ", " + U.date(Date.now()) + " · " + U.time(Date.now()),
-      sheet: true,
-      body: () => {
-        const okW = !cfg.wifiRequired || c.wifi;
-        const okG = !cfg.gpsRequired || c.gps <= cfg.gpsRadius;
-        const row = (ok, title, detail, act) => '<div class="list-row" style="padding:10px 0;border:0">' + '<span class="badge badge-' + (ok ? "success" : "danger") + '" style="width:28px;height:28px;padding:0;justify-content:center">' + I(ok ? "check" : "x", "ic-sm") + '</span><div class="grow"><div class="strong">' + title + '</div><div class="meta">' + detail + "</div></div>" + (act || "") + "</div>";
-        return row(okW, "Wi-Fi của quán", c.wifi ? "Đã kết nối " + esc(cfg.wifiName) : "Chưa kết nối " + esc(cfg.wifiName), '<button class="btn btn-sm btn-ghost" data-act="waiter.ciToggleWifi">Mô phỏng</button>') +
-          row(okG, "Vị trí", "Cách quán " + c.gps + " m (cho phép " + cfg.gpsRadius + " m)", '<button class="btn btn-sm btn-ghost" data-act="waiter.ciToggleGps">Mô phỏng</button>') +
-          (c.shot ? '<div class="camera-sim" style="background:#12805C;color:#fff">' + I("circle-check", "ic-2xl") + "<span>Đã chụp ảnh xác thực lúc " + U.time(Date.now()) + '</span></div><button class="btn btn-ghost btn-sm" data-act="waiter.ciShot">Chụp lại</button>' : UI.cameraSim({ flash: c.flash }) + UI.btn("Chụp ảnh xác thực", { act: "waiter.ciShot", block: true, icon: "camera" }));
-      },
-      foot: () => UI.btn("Xác nhận chấm công", { act: "waiter.ciSubmit", kind: "primary", size: "lg", block: true, disabled: cfg.selfieRequired && !c.shot }),
     });
   }
 
@@ -1168,7 +1148,7 @@
           const tipModeSelector =
             '<div class="card card-pad mt-8" style="background:var(--surface-2)">' +
               '<div class="small strong mb-4">' + I("hand-coins", "ic-sm") + " Quy chế xác định Tiền Tip (khi khách chuyển dư trên mức thanh toán):</div>" +
-              '<div class="chips">' +
+              '<div class="chips chips-wrap">' +
                 '<button type="button" class="chip ' + (p.tipMode === "personal" ? "active" : "") + '" data-act="waiter.payTipMode" data-mode="personal">Nhân viên đứng bàn hưởng 100% (' + esc(Engine.staffName(p.tipStaffId)) + ")</button>" +
                 '<button type="button" class="chip ' + (p.tipMode === "pool" ? "active" : "") + '" data-act="waiter.payTipMode" data-mode="pool">' + esc(poolLabel) + "</button>" +
                 '<button type="button" class="chip ' + (p.tipMode === "area" ? "active" : "") + '" data-act="waiter.payTipMode" data-mode="area">Chia theo tổ khu vực bàn</button>' +
@@ -1181,11 +1161,11 @@
                 amount: curNeed,
                 memo: payCode,
                 size: 176,
-                caption: "Đưa khách quét VietQR — Nội dung CK định danh riêng cho từng bill",
+                caption: "Đưa khách quét VietQR — Nội dung cố định, số tiền nhập tự do (nhận Tip)",
               }) +
               '<div class="banner banner-info">' +
                 I("zap") +
-                '<div><b>Tự động xác nhận qua API Biến động số dư:</b> Mỗi bàn/bill có mã nội dung riêng <b>' + esc(payCode) + '</b>. Khách chỉ cần chuyển <b>&gt;= ' + U.money(curNeed) + '</b>, hệ thống tự động báo <b>THANH TOÁN THÀNH CÔNG</b> ngay trên máy Phục vụ &amp; Thu ngân mà không cần chụp màn hình kiểm tra lại. Nếu khách chuyển lẻ nhiều lần (&lt; ' + U.money(curNeed) + '), hệ thống tự động cộng dồn!</div>' +
+                '<div><b>Số tiền mở tự do + Nội dung cố định (' + esc(payCode) + '):</b> Khi khách quét mã trên App ngân hàng, nội dung <b>' + esc(payCode) + '</b> được điền cố định còn ô số tiền để mở tự do. Khách nhập <b>&gt;= ' + U.money(curNeed) + '</b> (ví dụ chuyển thêm Tiền Tip), hệ thống tự động xác nhận hoàn tất bill và cộng phần dư vào Tiền Tip!</div>' +
               "</div>" +
               (!App.isDemo()
                 ? '<div class="row gap-8 mt-4">' +
@@ -1439,17 +1419,7 @@
     },
     "waiter.readNote": (d) => App.commit((s) => { const n = s.data.notifications.find((x) => x.id === d.id); if (n) n.read = true; }),
     "waiter.clean": (d) => App.commit(() => Engine.markClean(d.table), "Đã cập nhật bàn " + Engine.table(d.table).code + " sạch"),
-    "waiter.checkin": () => checkinModal(App.me()),
-    "waiter.ciToggleWifi": () => { const c = S()._ci; c.wifi = !c.wifi; App.render(); },
-    "waiter.ciToggleGps": () => { const c = S()._ci; c.gps = c.gps <= 50 ? 230 : 18; App.render(); },
-    "waiter.ciShot": () => { const c = S()._ci; c.flash = true; c.shot = false; App.render(); setTimeout(() => { c.flash = false; c.shot = true; App.render(); }, 450); },
-    "waiter.ciSubmit": () => {
-      const c = S()._ci;
-      const cfg = Store.config.attendance;
-      const me = App.me();
-      const r = App.commit(() => Engine.checkIn(me.id, { method: "mobile", wifi: c.wifi ? cfg.wifiName : "4G", gpsMeters: c.gps, selfie: c.shot }), (r) => "Đã chấm công vào ca lúc " + U.time(r.rec.in) + (r.penalty ? " · trễ " + r.rec.lateMin + " phút" : ""));
-      if (r) App.closeModal(true);
-    },
+    "waiter.checkin": () => App.openCheckinModal(),
     "waiter.checkout": async () => {
       const me = App.me();
       const myOpen = Engine.openTickets().filter((t) => t.waiterId === me.id);

@@ -79,7 +79,7 @@
 .cu-actions-info { flex: 1; min-width: 0; font-size: 13px; color: var(--text-3); font-weight: 500; }
 .cu-actions-end { justify-content: flex-end; border-top: 0; padding-top: 4px; }
 @media (max-width: 560px) {
-  .cu-actions { position: sticky; bottom: 0; z-index: 5; margin: 4px -18px -18px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); background: var(--surface); border-radius: 0 0 var(--radius-lg) var(--radius-lg); box-shadow: 0 -6px 16px rgba(16, 24, 40, .06); }
+  .cu-actions { position: static; margin: 8px 0 0; padding: 12px 0 0; background: transparent; border-radius: 0; box-shadow: none; }
   .cu-actions-end { position: static; box-shadow: none; margin: 0; padding: 4px 0 0; background: transparent; }
   .cu-actions .btn-primary { flex: 1; min-width: 0; }
   .cu-actions-info { display: none; }

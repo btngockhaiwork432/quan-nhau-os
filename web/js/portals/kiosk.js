@@ -699,21 +699,40 @@
   /* =====================================================================
      TAB 4 - CHAM CONG (tram chung, doc lap voi nguoi thao tac)
      ===================================================================== */
+  function stopKioskCam() {
+    if (T.camStream) {
+      try {
+        T.camStream.getTracks().forEach((tr) => tr.stop());
+      } catch (e) {}
+      T.camStream = null;
+    }
+  }
   function resetAtt() {
     clearTimeout(T.attTimer);
+    stopKioskCam();
     T.att = { phase: "pin", pin: "", error: "" };
   }
   function pinPhase(a) {
     return '<div class="kx-pin">' +
-      '<div class="kx-pin-head"><span class="kx-pin-ic">' + I("clock") + "</span><h2>Chấm công</h2><p>Nhập mã PIN 4 số của bạn. Camera tự chụp ảnh xác thực trong 1 giây.</p></div>" +
+      '<div class="kx-pin-head"><span class="kx-pin-ic">' + I("clock") + "</span><h2>Chấm công</h2><p>Nhập mã PIN 4 số của bạn. Camera trên máy trạm tự động chụp ảnh xác thực.</p></div>" +
       UI.pinDots(a.pin.length, !!a.error) +
       '<div class="kx-pin-msg">' + (a.error ? '<span class="text-danger">' + esc(a.error) + "</span>" : "Dùng chung cho mọi vị trí: bếp, hồ cá, vệ sinh, phục vụ") + "</div>" +
       UI.numpad("kiosk.pin", { cls: "k-numpad kx-pin-pad" }) + "</div>";
   }
   function cameraPhase(a) {
     const s = Engine.staff(a.staffId) || {};
-    return '<div class="kx-camphase"><h2>Xin chào, ' + esc(s.name || "") + '</h2><p class="kx-camphase-sub">' + esc(Engine.roleLabel(s.role)) + " · Nhìn thẳng vào camera, giữ yên trong giây lát</p>" +
-      '<div class="camera-sim kx-selfie' + (a.flash ? " flash" : "") + '"><span class="kx-face"></span><span class="kx-selfie-txt">' + I("camera", "ic-sm") + (a.flash ? "Đã chụp" : "Đang chụp ảnh xác thực...") + '</span><span class="kx-selfie-bar"></span></div></div>';
+    return '<div class="kx-camphase"><h2>Xin chào, ' + esc(s.name || "") + '</h2><p class="kx-camphase-sub">' + esc(Engine.roleLabel(s.role)) + " · Nhìn thẳng vào camera để ghi nhận chấm công</p>" +
+      (T.camStream
+        ? '<div class="col center gap-12" style="width:100%;max-width:360px">' +
+          '<video id="kiosk-live-video" autoplay playsinline muted style="width:100%;border-radius:14px;background:#111;transform:scaleX(-1);aspect-ratio:4/3;object-fit:cover;border:2px solid var(--primary)"></video>' +
+          kbtn("Chụp & Xác nhận ngay", "kiosk.snapNow", { kind: "primary", icon: "camera" }) +
+          "</div>"
+        : '<div class="card card-pad center col gap-8" style="max-width:360px">' +
+          I("shield-check", "ic-2xl") +
+          '<div class="strong">' + esc(a.camNote || "Đang kiểm tra camera thiết bị Kiosk...") + "</div>" +
+          kbtn("Xác nhận chấm công tại Kiosk", "kiosk.snapNow", { kind: "primary", icon: "check" }) +
+          "</div>") +
+      "</div>";
   }
   function resultPhase(a) {
     const s = Engine.staff(a.staffId);
@@ -764,24 +783,62 @@
     return '<div class="kiosk-body kx-clock-body"><section class="kx-station" data-keep-scroll="ks">' + main + "</section>" + side + "</div>";
   }
 
-  function startCamera(staff) {
+  async function startCamera(staff) {
     const a = T.att;
+    stopKioskCam();
     a.phase = "camera";
     a.staffId = staff.id;
     a.pin = "";
     a.flash = false;
+    a.camNote = "Đang mở camera thiết bị Kiosk...";
     App.render();
     clearTimeout(T.attTimer);
-    T.attTimer = setTimeout(() => {
-      a.flash = true;
-      App.render();
-      T.attTimer = setTimeout(() => punch(staff.id), 380);
-    }, 1000);
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 480 }, height: { ideal: 360 } },
+          audio: false,
+        });
+        if (T.att.phase !== "camera" || T.att.staffId !== staff.id) {
+          stream.getTracks().forEach((tr) => tr.stop());
+          return;
+        }
+        T.camStream = stream;
+        App.render();
+        T.attTimer = setTimeout(() => captureAndPunch(staff.id), 1300);
+        return;
+      } catch (e) {}
+    }
+    a.camNote = "Máy trạm Kiosk không gắn webcam — đang xác thực bằng mã PIN nội bộ tại quầy...";
+    App.render();
+    T.attTimer = setTimeout(() => captureAndPunch(staff.id), 900);
   }
-  function punch(staffId) {
+  function captureAndPunch(staffId) {
+    clearTimeout(T.attTimer);
+    let selfieUrl = null;
+    const vid = document.getElementById("kiosk-live-video");
+    if (vid && vid.videoWidth) {
+      try {
+        const w = 320;
+        const h = Math.max(200, Math.round((vid.videoHeight / vid.videoWidth) * w));
+        const cv = document.createElement("canvas");
+        cv.width = w;
+        cv.height = h;
+        cv.getContext("2d").drawImage(vid, 0, 0, w, h);
+        selfieUrl = cv.toDataURL("image/jpeg", 0.72);
+      } catch (e) {}
+    }
+    stopKioskCam();
+    punch(staffId, selfieUrl);
+  }
+  function punch(staffId, selfieUrl) {
     const a = T.att;
     const active = Engine.activeAtt(staffId);
-    const res = App.commit(() => (active ? Engine.checkOut(staffId, { method: "kiosk" }) : Engine.checkIn(staffId, { method: "kiosk", selfie: true })));
+    const res = App.commit(() =>
+      active
+        ? Engine.checkOut(staffId, { method: "kiosk" })
+        : Engine.checkIn(staffId, { method: "kiosk", selfie: true, selfieUrl: selfieUrl || null })
+    );
     if (!res) {
       resetAtt();
       App.render();
@@ -844,6 +901,13 @@
       return '<div class="kiosk kx-root" data-tab="' + st.tab + '">' + topBar(me, st) + (showKpi ? kpis() : "") + body + footer(me, st) + successOverlay() + (st.idle ? idleScreen() : "") + "</div>";
     },
     after() {
+      if (T.camStream) {
+        const vid = document.getElementById("kiosk-live-video");
+        if (vid && vid.srcObject !== T.camStream) {
+          vid.srcObject = T.camStream;
+          vid.play().catch(() => {});
+        }
+      }
       if (T.scrollFocus) {
         T.scrollFocus = false;
         const el = document.querySelector(".kx-cell.focus");
@@ -959,10 +1023,10 @@
       const tb = Engine.table(tk.tableId);
       const m = Engine.menu(it.menuId) || {};
       const style = it.styleId ? Engine.style(it.styleId) : null;
-      const job = App.commit(() => Engine.print({
-        printerId: m.printerId || (m.kind === "seafood" ? "p_tank" : "p_hot"),
+      const job = App.commit(() => Engine.print(m.printerId || (m.kind === "seafood" ? "p_tank" : "p_kitchen"), {
         kind: m.kind === "seafood" ? "tag" : "kitchen",
         title: "PHIẾU BẾP / HỒ CÁ (IN LẠI)",
+        big: tb ? tb.code : tk.tableId,
         meta: [
           { l: "Bàn", r: tb ? tb.code : tk.tableId },
           { l: "Giờ in", r: U.time() },
@@ -1387,6 +1451,11 @@
         }
       }
       App.render();
+    },
+    "kiosk.snapNow": () => {
+      if (T.att && T.att.phase === "camera" && T.att.staffId) {
+        captureAndPunch(T.att.staffId);
+      }
     },
     "kiosk.attDone": () => {
       resetAtt();

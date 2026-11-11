@@ -125,6 +125,8 @@ CREATE TABLE IF NOT EXISTS printers (
     copies          INTEGER NOT NULL DEFAULT 1,
     online          BOOLEAN NOT NULL DEFAULT TRUE,
     backup_id       TEXT DEFAULT '',
+    ip_address      TEXT NOT NULL DEFAULT '',
+    port            INTEGER NOT NULL DEFAULT 9100,
     categories_json JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
@@ -168,6 +170,9 @@ CREATE TABLE IF NOT EXISTS attendance (
     method          TEXT NOT NULL DEFAULT 'kiosk',
     late_min        INTEGER NOT NULL DEFAULT 0,
     selfie          BOOLEAN NOT NULL DEFAULT TRUE,
+    selfie_url      TEXT,
+    gps_meters      INTEGER,
+    client_ip       TEXT,
     ot_pending_min  INTEGER NOT NULL DEFAULT 0,
     ot_approved_min INTEGER NOT NULL DEFAULT 0,
     ot_auto_min     INTEGER NOT NULL DEFAULT 0,
@@ -474,15 +479,17 @@ CREATE TABLE IF NOT EXISTS daily_stats (
 );
 
 CREATE TABLE IF NOT EXISTS print_logs (
-    id              TEXT PRIMARY KEY,
-    printed_at      BIGINT NOT NULL,
-    printer_id      TEXT NOT NULL,
-    printer_name    TEXT NOT NULL,
-    kind            TEXT NOT NULL,
-    title           TEXT NOT NULL,
-    rerouted        TEXT,
-    failed          BOOLEAN NOT NULL DEFAULT FALSE,
-    doc_json        JSONB NOT NULL DEFAULT '{}'::jsonb
+    id                  TEXT PRIMARY KEY,
+    printed_at          BIGINT NOT NULL,
+    printer_id          TEXT NOT NULL,
+    printer_name        TEXT NOT NULL,
+    kind                TEXT NOT NULL,
+    title               TEXT NOT NULL,
+    rerouted            TEXT,
+    failed              BOOLEAN NOT NULL DEFAULT FALSE,
+    printed_physical    BOOLEAN NOT NULL DEFAULT FALSE,
+    printed_physical_at BIGINT,
+    doc_json            JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (

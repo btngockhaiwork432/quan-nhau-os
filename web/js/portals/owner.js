@@ -639,17 +639,24 @@
       '<td class="num strong">' + U.money(p.net) + "</td>" +
       '<td class="right">' + UI.btn("Phiếu lương", { size: "sm", icon: "receipt-text", act: "owner.payslip", data: { id: s.id } }) + "</td></tr>").join("");
 
-    const attRows = D().attendance.slice(0, 30).map((a) => {
+    const attRows = D().attendance.slice().reverse().slice(0, 30).map((a) => {
       const s = Engine.staff(a.staffId);
       const pen = Engine.latePenalty(a.lateMin);
-      return "<tr><td>" + U.dayLabel(a.dayKey) + "</td><td><b>" + esc(s ? s.name : a.staffId) + "</b></td><td>" + esc(s ? Engine.roleLabel(s.role) : "") + '</td><td class="num">' + U.time(a.in) + '</td><td class="num">' + (a.out ? U.time(a.out) : '<span class="badge badge-success">Đang làm</span>') + "</td><td>" + (a.lateMin > C().attendance.graceMinutes ? UI.badge("Trễ " + a.lateMin + " phút (-" + U.money(pen) + ")", "danger") : UI.badge("Đúng giờ", "success")) + "</td><td>" + esc(a.method === "kiosk" ? "Kiosk bếp" : "Điện thoại") + "</td></tr>";
+      const locMeta = [
+        a.gpsMeters !== undefined && a.gpsMeters !== null ? "GPS " + a.gpsMeters + "m" : "",
+        a.clientIp ? "IP " + a.clientIp : "",
+      ].filter(Boolean).join(" · ");
+      const photoCell = a.selfieUrl
+        ? '<button type="button" class="btn btn-xs btn-ghost" data-act="owner.attPhoto" data-id="' + esc(a.id) + '" style="padding:2px 6px;height:auto"><img src="' + a.selfieUrl + '" alt="Selfie" style="width:32px;height:24px;object-fit:cover;border-radius:4px;margin-right:4px">Xem ảnh</button>'
+        : UI.badge(a.method === "kiosk" ? "PIN Kiosk" : "Đã xác thực", "neutral");
+      return "<tr><td>" + U.dayLabel(a.dayKey) + "</td><td><b>" + esc(s ? s.name : a.staffId) + "</b></td><td>" + esc(s ? Engine.roleLabel(s.role) : "") + '</td><td class="num">' + U.time(a.in) + '</td><td class="num">' + (a.out ? U.time(a.out) : '<span class="badge badge-success">Đang làm</span>') + "</td><td>" + (a.lateMin > C().attendance.graceMinutes ? UI.badge("Trễ " + a.lateMin + " phút (-" + U.money(pen) + ")", "danger") : UI.badge("Đúng giờ", "success")) + "</td><td>" + photoCell + "</td><td>" + esc(a.method === "kiosk" ? "Kiosk bếp" : "Điện thoại") + (locMeta ? '<div class="small muted">' + esc(locMeta) + "</div>" : "") + "</td></tr>";
     }).join("");
 
     return '<div class="page">' +
       head("Nhân sự và bảng lương", "Tự động tổng hợp công, phụ cấp ca đêm, tăng ca, hoa hồng, tiền tip và khấu trừ.", monthSelect() + UI.btn("Xuất bảng lương CSV", { size: "sm", icon: "download", act: "owner.exportPayroll" })) +
       kpis +
       card("Bảng lương chi tiết · " + U.monthLabel(mk), tbl('<th>Nhân viên</th><th class="num">Công chuẩn</th><th class="num">Tăng ca</th><th class="num">Lương cơ bản</th><th class="num">Tăng ca & đêm</th><th class="num">Thưởng & tip</th><th class="num">Phạt & đền</th><th class="num">Đã ứng</th><th class="num">Thực lĩnh</th><th></th>', rows), { icon: "users", flush: true }) +
-      card("Nhật ký chấm công gần đây", tbl('<th>Ngày</th><th>Nhân viên</th><th>Vai trò</th><th class="num">Giờ vào</th><th class="num">Giờ ra</th><th>Ghi nhận</th><th>Thiết bị</th>', attRows), { icon: "clock", flush: true }) +
+      card("Nhật ký chấm công gần đây", tbl('<th>Ngày</th><th>Nhân viên</th><th>Vai trò</th><th class="num">Giờ vào</th><th class="num">Giờ ra</th><th>Ghi nhận</th><th>Ảnh xác thực</th><th>Thiết bị & Mạng</th>', attRows), { icon: "clock", flush: true }) +
       "</div>";
   }
 
@@ -973,6 +980,23 @@
       if (!ok) return;
       App.commit(() => Engine.lockTaxPeriod(mk), "Đã khóa sổ kỳ thuế " + U.monthLabel(mk));
       App.render();
+    },
+    "owner.attPhoto": (d) => {
+      const a = (D().attendance || []).find((x) => x.id === d.id);
+      if (!a || !a.selfieUrl) return;
+      const st = Engine.staff(a.staffId);
+      App.modal({
+        title: "Ảnh xác thực chấm công · " + (st ? st.name : a.staffId),
+        sub: U.dayLabel(a.dayKey) + " · Vào ca lúc " + U.time(a.in),
+        size: "sm",
+        body: () =>
+          '<div class="col center gap-8">' +
+          '<img src="' + a.selfieUrl + '" alt="Ảnh chấm công" style="width:100%;max-width:340px;border-radius:12px;border:1px solid var(--line)">' +
+          '<div class="small muted">' +
+          esc([a.gpsMeters !== undefined && a.gpsMeters !== null ? "Khoảng cách GPS: " + a.gpsMeters + " m" : "", a.clientIp ? "IP mạng: " + a.clientIp : ""].filter(Boolean).join(" · ")) +
+          "</div></div>",
+        foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
+      });
     },
     "owner.unlockShift": () => {
       const sh = Engine.currentShift();

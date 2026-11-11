@@ -265,6 +265,13 @@
     width: 20px;
     height: 20px;
   }
+  .kiosk-tab .count {
+    position: static;
+    min-width: 20px;
+    height: 20px;
+    font-size: 11px;
+    flex: 0 0 auto;
+  }
   .kx-operator {
     flex: 1 1 200px;
     height: 54px;

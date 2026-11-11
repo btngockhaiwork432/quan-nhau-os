@@ -314,27 +314,6 @@
     },
   });
 
-  /* ---------- Hop cham cong ---------- */
-  function checkinModal() {
-    const ac = cfg().attendance;
-    const st = S();
-    const c = (st._ci = { wifi: true, gps: 18, shot: false, flash: false });
-    App.modal({
-      title: "Chấm công vào ca",
-      sub: U.weekday(Date.now()) + ", " + U.date(Date.now()) + " · " + U.time(Date.now()),
-      sheet: true,
-      body: () => {
-        const okW = !ac.wifiRequired || c.wifi;
-        const okG = !ac.gpsRequired || c.gps <= ac.gpsRadius;
-        const row = (ok, title, detail, act) => '<div class="list-row" style="padding:10px 0;border:0">' + '<span class="badge badge-' + (ok ? "success" : "danger") + '" style="width:28px;height:28px;padding:0;justify-content:center">' + I(ok ? "check" : "x", "ic-sm") + '</span><div class="grow"><div class="strong">' + title + '</div><div class="meta">' + detail + "</div></div>" + (act || "") + "</div>";
-        return row(okW, "Wi-Fi của quán", c.wifi ? "Đã kết nối " + esc(ac.wifiName) : "Chưa kết nối " + esc(ac.wifiName), '<button class="btn btn-sm btn-ghost" data-act="pg.ciToggleWifi">Mô phỏng</button>') +
-          row(okG, "Vị trí", "Cách quán " + c.gps + " m (cho phép " + ac.gpsRadius + " m)", '<button class="btn btn-sm btn-ghost" data-act="pg.ciToggleGps">Mô phỏng</button>') +
-          (c.shot ? '<div class="camera-sim" style="background:#12805C;color:#fff">' + I("circle-check", "ic-2xl") + "<span>Đã chụp ảnh xác thực lúc " + U.time(Date.now()) + '</span></div><button class="btn btn-ghost btn-sm" data-act="pg.ciShot">Chụp lại</button>' : UI.cameraSim({ flash: c.flash }) + UI.btn("Chụp ảnh xác thực", { act: "pg.ciShot", block: true, icon: "camera" }));
-      },
-      foot: () => UI.btn("Xác nhận chấm công", { act: "pg.ciSubmit", kind: "primary", size: "lg", block: true, disabled: ac.selfieRequired && !c.shot }),
-    });
-  }
-
   function retParse(v) { const n = Math.floor(Number(String(v === undefined ? "" : v).replace(/[^\d]/g, "")) || 0); return Math.max(0, n); }
 
   /* ---------- Hanh dong ---------- */
@@ -420,17 +399,7 @@
       const ok = App.commit(() => Engine.submitPgReturn({ by: me.id, caps: out, crates, note }), "Đã ghi nhận nộp " + totalCaps + " nắp" + (crates ? " và " + crates + " vỏ két" : ""));
       if (ok) { st.ret = { caps: {}, crates: "", note: "" }; App.render(); }
     },
-    "pg.checkin": () => checkinModal(),
-    "pg.ciToggleWifi": () => { const c = S()._ci; c.wifi = !c.wifi; App.render(); },
-    "pg.ciToggleGps": () => { const c = S()._ci; c.gps = c.gps <= cfg().attendance.gpsRadius ? 230 : 18; App.render(); },
-    "pg.ciShot": () => { const c = S()._ci; c.flash = true; c.shot = false; App.render(); setTimeout(() => { c.flash = false; c.shot = true; App.render(); }, 450); },
-    "pg.ciSubmit": () => {
-      const c = S()._ci;
-      const ac = cfg().attendance;
-      const me = App.me();
-      const r = App.commit(() => Engine.checkIn(me.id, { method: "mobile", wifi: c.wifi ? ac.wifiName : "4G", gpsMeters: c.gps, selfie: c.shot }), (res) => "Đã chấm công vào ca lúc " + U.time(res.rec.in) + (res.penalty ? " · trễ " + res.rec.lateMin + " phút" : ""));
-      if (r) App.closeModal(true);
-    },
+    "pg.checkin": () => App.openCheckinModal(),
     "pg.checkout": async () => {
       const me = App.me();
       const pending = Engine.pgStats(me.id).capsPending;

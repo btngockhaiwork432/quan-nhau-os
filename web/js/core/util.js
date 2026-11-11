@@ -258,6 +258,20 @@
     return s + crc16(s);
   };
 
+  // Tinh khoang cach thuc te (met) giua 2 toa do GPS theo cong thuc Haversine
+  U.haversineMeters = function (lat1, lng1, lat2, lng2) {
+    const a1 = Number(lat1), o1 = Number(lng1), a2 = Number(lat2), o2 = Number(lng2);
+    if (!Number.isFinite(a1) || !Number.isFinite(o1) || !Number.isFinite(a2) || !Number.isFinite(o2)) return null;
+    const R = 6371000;
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const dLat = toRad(a2 - a1);
+    const dLng = toRad(o2 - o1);
+    const sinLat = Math.sin(dLat / 2);
+    const sinLng = Math.sin(dLng / 2);
+    const h = sinLat * sinLat + Math.cos(toRad(a1)) * Math.cos(toRad(a2)) * sinLng * sinLng;
+    return Math.round(2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h))));
+  };
+
   U.download = function (filename, content, mime) {
     const blob = new Blob([content], { type: mime || "text/plain;charset=utf-8" });
     const a = document.createElement("a");

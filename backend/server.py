@@ -9,19 +9,21 @@ Cung cap:
 """
 
 import asyncio
+import io
 import json
 import os
 import re
 import threading
 import time
 import urllib.request
+import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -99,7 +101,71 @@ class SqlQueryPayload(BaseModel):
     query: str
 
 
+class PrintAckPayload(BaseModel):
+    ids: List[str] = []
+
+
+def _extract_client_ip(request: Request) -> str:
+    xff = (request.headers.get("x-forwarded-for") or "").strip()
+    if xff:
+        first = xff.split(",")[0].strip()
+        if first:
+            return first
+    xri = (request.headers.get("x-real-ip") or "").strip()
+    if xri:
+        return xri
+    if request.client and request.client.host:
+        return str(request.client.host).strip()
+    return ""
+
+
 # ======================= HEALTH & DB INTROSPECTION =======================
+
+@app.get("/api/client-info")
+def api_client_info(request: Request):
+    return {
+        "ok": True,
+        "ip": _extract_client_ip(request),
+        "at": int(time.time() * 1000),
+    }
+
+
+@app.get("/api/print-queue")
+def api_get_print_queue(max_age_sec: int = Query(default=900, ge=10, le=86400)):
+    jobs = db.get_pending_print_jobs(max_age_ms=max_age_sec * 1000)
+    return {
+        "ok": True,
+        "count": len(jobs),
+        "jobs": jobs,
+        "at": int(time.time() * 1000),
+    }
+
+
+@app.post("/api/print-queue/ack")
+def api_ack_print_queue(payload: PrintAckPayload):
+    acked = db.ack_print_jobs(payload.ids or [])
+    return {
+        "ok": True,
+        "acked": acked,
+        "at": int(time.time() * 1000),
+    }
+
+
+@app.get("/api/print-agent/download")
+def api_download_print_agent():
+    agent_dir = BACKEND_DIR.parent / "print_agent"
+    if not agent_dir.exists():
+        raise HTTPException(status_code=404, detail="Chưa tìm thấy thư mục print_agent trên máy chủ.")
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for p in sorted(agent_dir.iterdir()):
+            if p.is_file():
+                zf.write(str(p), arcname=f"QuanNhau_MayIn_LAN/{p.name}")
+    return Response(
+        content=mem.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="QuanNhau_MayIn_LAN.zip"'},
+    )
 
 @app.get("/api/health")
 def api_health():
