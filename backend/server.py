@@ -516,7 +516,44 @@ def api_receive_payment_webhook(payload: PaymentWebhookPayload, request: Request
                 break
 
     if not matched_tk:
-        # Kiem tra ngoai le: Ma chuyen khoan khop voi 1 bill DA DONG (khach chuyen trung 2 lan hoac chuyen sau khi da thu tien mat)
+        # 1. Kiem tra chuyen khoan TIEN COC DAT BAN TRUC TUYEN (Noi dung: COC <Ma dat ban>)
+        if norm_content:
+            for bk in data.get("bookings") or []:
+                if bk.get("status") not in ("holding", "pending_deposit"):
+                    continue
+                raw_id = "".join(ch for ch in str(bk.get("id") or "") if ch.isalnum()).upper()[-6:]
+                bk_code = _norm_code(bk.get("code") or f"DB{raw_id}")
+                if bk_code and bk_code in norm_content:
+                    dep_need = int(bk.get("deposit") or 0)
+                    if amount >= dep_need:
+                        bk["depositPaid"] = True
+                        bk["status"] = "confirmed"
+                        bk["paidAt"] = now_ms
+                        log_entry = {
+                            "id": f"wh_{now_ms}",
+                            "txId": tx_id,
+                            "at": now_ms,
+                            "gateway": gateway,
+                            "amount": amount,
+                            "content": content,
+                            "bookingId": bk.get("id"),
+                            "bookingCode": bk_code,
+                            "tableId": bk.get("tableId"),
+                            "status": "matched_booking_deposit",
+                        }
+                        webhook_logs.insert(0, log_entry)
+                        rev = db.persist_state_to_postgres(
+                            st,
+                            who="webhook",
+                            audit_text=f"Webhook QR tự động xác nhận tiền cọc đặt bàn {bk_code} ({bk.get('name')}): {amount:,} đ",
+                        )
+                        broadcast_event(
+                            "state_updated",
+                            {"revision": rev, "who": "webhook", "auditText": f"Đã nhận cọc đặt bàn {bk_code}", "at": now_ms},
+                        )
+                        return {"ok": True, "revision": rev, "booking": bk, "webhook": log_entry}
+
+        # 2. Kiem tra ngoai le: Ma chuyen khoan khop voi 1 bill DA DONG (khach chuyen trung 2 lan hoac chuyen sau khi da thu tien mat)
         closed_sale = None
         if norm_content:
             for s in reversed(data.get("sales") or []):

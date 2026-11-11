@@ -334,7 +334,10 @@
       '<div class="cu-sec"><div class="cu-sec-title">' + I("receipt-text") + "Thông tin đặt bàn</div>" + bookingDetails(bk, false) + "</div>" +
       '<div class="cu-demo"><span class="cu-demo-tag">' + I("layers", "ic-sm") + "Bản demo</span><span class=\"small\">Trong thực tế bước này do ngân hàng tự động báo về.</span>" +
       UI.btn("Mô phỏng: ngân hàng báo đã nhận cọc", { act: "customer.simPaid", kind: "primary", icon: "circle-check", block: true, size: "lg" }) + "</div>" +
-      '<div class="cu-actions cu-actions-end">' + UI.btn("Hủy giữ chỗ", { act: "customer.cancelHold", kind: "danger", icon: "x" }) + "</div>" +
+      '<div class="cu-actions cu-actions-end">' +
+      UI.btn("Tôi đã chuyển khoản (Kiểm tra)", { act: "customer.checkDeposit", kind: "primary", icon: "refresh-cw" }) +
+      UI.btn("Hủy giữ chỗ", { act: "customer.cancelHold", kind: "danger", icon: "x" }) +
+      "</div>" +
       "</div>";
   }
 
@@ -623,6 +626,18 @@
       const id = S().bk.bookingId;
       App.commit(() => Engine.confirmDeposit(id), "Ngân hàng đã báo nhận tiền cọc. Đặt bàn đã được xác nhận");
       scrollTop();
+    },
+    "customer.checkDeposit": async () => {
+      await Store.syncFromPostgres(false);
+      const id = S().bk.bookingId;
+      const bk = Engine.booking(id);
+      if (bk && bk.status === "confirmed") {
+        App.toast("Đã nhận được tiền cọc! Đặt bàn của bạn đã được xác nhận.", "success");
+        scrollTop();
+      } else {
+        App.toast("Hệ thống đang chờ ngân hàng báo nhận cọc hoặc thu ngân xác nhận tại quầy.", "info");
+      }
+      App.render();
     },
     "customer.cancelHold": async () => {
       const id = S().bk.bookingId;
