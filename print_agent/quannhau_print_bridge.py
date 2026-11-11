@@ -60,6 +60,29 @@ def format_two_cols(left: str, right: str, width: int = LINE_WIDTH, use_utf8: bo
     return l_txt + (" " * space) + r_txt
 
 
+def build_escpos_qr(qr_data: str, module_size: int = 6) -> bytes:
+    """Sinh lenh in ma QR goc chuan ESC/POS (GS ( k - Model 2) ho tro Xprinter/Zywell/Epson K80."""
+    if not qr_data:
+        return b""
+    raw = str(qr_data).encode("utf-8")
+    store_len = len(raw) + 3
+    pl = store_len & 0xFF
+    ph = (store_len >> 8) & 0xFF
+    size_b = bytes([max(3, min(8, int(module_size)))])
+    out = bytearray()
+    # 1. Chon QR Model 2
+    out.extend(b"\x1d\x28\x6b\x04\x00\x31\x41\x32\x00")
+    # 2. Kich thuoc o vuong QR
+    out.extend(b"\x1d\x28\x6b\x03\x00\x31\x43" + size_b)
+    # 3. Muc sua loi M (49 = 0x31)
+    out.extend(b"\x1d\x28\x6b\x03\x00\x31\x45\x31")
+    # 4. Nap du lieu QR vao bo nho may in
+    out.extend(bytes([0x1D, 0x28, 0x6B, pl, ph, 0x31, 0x50, 0x30]) + raw)
+    # 5. In ma QR ra giay
+    out.extend(b"\x1d\x28\x6b\x03\x00\x31\x51\x30")
+    return bytes(out)
+
+
 def build_escpos_payload(job: Dict[str, Any], use_utf8: bool = False, beep: bool = True) -> bytes:
     doc = job.get("doc") or {}
     kind = str(job.get("kind") or doc.get("kind") or "kitchen")
@@ -155,11 +178,16 @@ def build_escpos_payload(job: Dict[str, Any], use_utf8: bool = False, beep: bool
             if is_bold:
                 buf.extend(BOLD_OFF)
 
-    # Ghi chu QR / VAT / Footer
-    if doc.get("qrLabel"):
+    # Ghi chu QR + Ma VietQR ESC/POS / VAT / Footer
+    if doc.get("qrLabel") or doc.get("qr"):
         buf.extend(encode_line(sep_dash, use_utf8))
         buf.extend(ALIGN_CENTER)
-        buf.extend(encode_line(doc.get("qrLabel"), use_utf8))
+        if doc.get("qrLabel"):
+            buf.extend(encode_line(doc.get("qrLabel"), use_utf8))
+        if doc.get("qr"):
+            buf.extend(b"\n")
+            buf.extend(build_escpos_qr(str(doc.get("qr")), module_size=6))
+            buf.extend(b"\n")
         buf.extend(ALIGN_LEFT)
 
     if doc.get("footer"):

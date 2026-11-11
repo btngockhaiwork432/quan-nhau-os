@@ -1129,7 +1129,7 @@
     const guide =
       '<div class="banner banner-info mb-12">' +
       I("printer") +
-      '<div><b>Kết nối máy in nhiệt K80 tự động (Bếp chỉ cần cắm 1 máy in mạng LAN là tự động in):</b> Điền địa chỉ <b>IP LAN</b> cố định của từng máy in nhiệt (ví dụ <code>192.168.1.201</code>, cổng chuẩn <code>9100</code>) rồi mở tệp <code>CHAY_KET_NOI_MAY_IN_LAN.bat</code> trên máy tính Thu ngân. Khi Phục vụ gửi món hoặc Hồ cá cân xong, máy in Bếp tự động cắt giấy in ngay mà Bếp không cần bấm gì.</div>' +
+      '<div><b>Mô hình chuẩn 1 Laptop tại quầy + 2 Máy in bill (1 Thu ngân, 1 Bếp):</b> Bấm nút <b>Thiết lập nhanh: 2 máy in (1 Thu ngân + 1 Bếp)</b> ở bảng Định tuyến bên dưới để tự gộp mọi món ăn &amp; tem hải sản về <b>Máy in Bếp</b>, còn hóa đơn &amp; phiếu bia/nước về <b>Máy in Thu ngân</b>. Điền <b>IP LAN</b> (cổng <code>9100</code>) của máy in rồi tải và mở <code>CAI_TU_KHOI_DONG_CUNG_WINDOWS.bat</code> trên chiếc Laptop tại quán là Bếp tự động nhả phiếu 100%.</div>' +
       "</div>";
     return cardShell(CARD.printers,
       guide + '<div class="table-wrap set-list"><table class="dt"><thead><tr><th>Tên máy in</th><th>Vị trí</th><th>IP LAN</th><th>Cổng</th><th>Công dụng</th><th>Số liên</th><th>Máy dự phòng</th><th class="center">Kết nối</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>",
@@ -1157,7 +1157,7 @@
     return cardShell(
       CARD.routing,
       '<div class="table-wrap set-list"><table class="dt"><thead><tr>' + head + "</tr></thead><tbody>" + rows + "</tbody></table></div>",
-      { head: UI.btn("Chế độ 1 máy in Bếp duy nhất (Gộp mọi món ăn về Bếp)", { act: "settings.singleKitchenMode", icon: "check-check", size: "sm" }) }
+      { head: UI.btn("Thiết lập nhanh: 2 máy in (1 Thu ngân + 1 Bếp)", { act: "settings.singleKitchenMode", icon: "check-check", size: "sm" }) }
     );
   }
 
@@ -1877,20 +1877,32 @@
     "settings.singleKitchenMode": () => {
       const d = draft();
       const foodCats = d.categories.filter((c) => c.kind !== "drink" && c.kind !== "beer").map((c) => c.id);
+      const drinkCats = d.categories.filter((c) => c.kind === "drink" || c.kind === "beer").map((c) => c.id);
+      const cashierPr = d.printers.find((p) => p.id === "p_cashier") || d.printers.find((p) => p.purpose === "bill");
       const mainKitchen = d.printers.find((p) => p.id === "p_kitchen") || d.printers.find((p) => p.purpose === "kitchen");
       if (!mainKitchen) {
         App.toast("Chưa có máy in Bếp nào trong danh sách.", "error");
         return;
       }
       d.printers.forEach((p) => {
-        if (p.id === mainKitchen.id) {
+        if (cashierPr && p.id === cashierPr.id) {
+          p.online = true;
+          p.backupId = mainKitchen.id;
+        } else if (p.id === mainKitchen.id) {
           p.online = true;
           p.categories = foodCats.slice();
-        } else if (p.purpose === "kitchen" && p.id !== "p_bar") {
+          if (cashierPr) p.backupId = cashierPr.id;
+        } else if (p.id === "p_bar" && cashierPr) {
+          p.online = false;
+          p.categories = drinkCats.slice();
+          p.backupId = cashierPr.id;
+        } else {
+          p.online = false;
           p.categories = [];
+          p.backupId = mainKitchen.id;
         }
       });
-      App.toast("Đã gộp toàn bộ nhóm món ăn về 1 máy in duy nhất: " + mainKitchen.name + ". Bấm Lưu và áp dụng để hoàn tất!", "success");
+      App.toast("Đã cấu hình chuẩn 2 máy in: 1 Máy Thu ngân (in Bill + Bia/Nước) + 1 Máy Bếp (in mọi món ăn & hải sản). Bấm Lưu và áp dụng!", "success");
       App.render();
     },
     "settings.routeToggle": (d, el) => {

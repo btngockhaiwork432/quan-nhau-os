@@ -4,115 +4,126 @@
 
 ---
 
-## PHẦN 1: BẮT ĐẦU SỬ DỤNG PHẦN MỀM TRONG 1 PHÚT
+## PHẦN 1: SƠ ĐỒ THIẾT BỊ THỰC TẾ TẠI QUÁN & ĐƯỜNG DẪN TRUY CẬP
 
-Phần mềm Quản lý Quán Nhậu của bạn đã được cài đặt sẵn sàng trên mạng tại địa chỉ https://munbao.com. Bạn và nhân viên không cần cài đặt bất kỳ phần mềm phức tạp nào, chỉ cần mở trình duyệt trên Điện thoại, Máy tính bảng hoặc Máy tính tại quầy là sử dụng được ngay.
+Phần mềm Quản lý Quán Nhậu của bạn đã sẵn sàng trên mạng tại địa chỉ https://munbao.com. Quán vận hành trơn tru chỉ với đúng thiết bị hiện có: 01 chiếc Laptop đặt tại Quầy thu ngân, 02 máy in bill nhiệt K80 (01 máy ở Thu ngân, 01 máy ở Bếp) và điện thoại cá nhân của Chủ quán cùng nhân viên (hoàn toàn không cần mua máy tính bảng riêng cho Bếp hay Hồ cá).
 
 > **Mẹo đưa biểu tượng phần mềm ra màn hình chính Điện thoại (như một App thật):**
 > • Trên iPhone / iPad (Safari): Mở https://munbao.com/login -> Bấm nút Chia sẻ (biểu tượng mũi tên lên ở giữa đáy màn hình) -> Chọn 'Thêm vào MH chính' (Add to Home Screen).
 > • Trên điện thoại Android (Chrome): Mở https://munbao.com/login -> Bấm dấu 3 chấm góc trên bên phải -> Chọn 'Thêm vào màn hình chính'.
 
-### 1.1. Hai đường dẫn duy nhất cần nhớ tại quán
+### 1.1. Sơ đồ 3 nhóm thiết bị vận hành thực tế tại quán
+
+| Thiết bị tại quán | Vị trí đặt | Vai trò trong ca bán hàng |
+| --- | --- | --- |
+| 1. 01 chiếc Laptop duy nhất | Quầy Thu ngân | Mở trình duyệt Chrome cho Thu ngân trực sơ đồ bàn, in tạm tính, thu tiền, chốt ca; đồng thời chạy ngầm bộ kết nối tự động đẩy lệnh in xuống máy in Bếp. |
+| 2. 02 máy in bill nhiệt K80 | • Máy 1: Quầy Thu ngân<br>• Máy 2: Khu Bếp | • Máy Thu ngân: In Phiếu tạm tính (kèm mã VietQR), Hóa đơn thanh toán, Chốt ca và Phiếu xuất Bia/Nước/Đá.<br>• Máy Bếp (cắm dây mạng LAN vào Wi-Fi quán): Tự động kêu bíp, nhả phiếu và cắt giấy ngay khi nhân viên bấm gửi món (Bếp không cần màn hình hay bấm nút). |
+| 3. Điện thoại cá nhân | Chủ quán & Nhân viên | • Chủ quán / Kế toán: Xem doanh thu, lãi lỗ, kho, ảnh chấm công và duyệt yêu cầu từ xa.<br>• Phục vụ & PG: Chấm công Camera trước + GPS + Wi-Fi quán, gọi món tại bàn, đưa mã VietQR nhận Tip.<br>• Phụ trách Hồ cá / Bếp: Nhập số ký khi cân cá tại bể, chụp ảnh báo hỏng, kiểm kho cuối ca. |
+
+### 1.2. Hai đường dẫn duy nhất cần nhớ tại quán
 
 | Đối tượng sử dụng | Đường dẫn truy cập | Cách đăng nhập & Sử dụng |
 | --- | --- | --- |
-| 1. Dành cho Chủ quán & Toàn bộ Nhân viên | https://munbao.com/login | Mỗi người nhập Mã PIN 4 số của riêng mình. Phần mềm tự nhận biết ai là Chủ quán, Thu ngân, Phục vụ, PG Bia hay Bếp để mở đúng màn hình công việc của người đó. |
+| 1. Dành cho Chủ quán & Toàn bộ Nhân viên | https://munbao.com/login | Mỗi người nhập Mã PIN 4 số của riêng mình. Phần mềm tự nhận biết ai là Chủ quán, Thu ngân, Phục vụ, PG Bia hay Hồ cá/Bếp để mở đúng màn hình công việc của người đó. |
 | 2. Dành cho Khách hàng của quán | https://munbao.com/customer | Khách hàng không cần mật khẩu. Dùng để gắn lên Fanpage/Zalo của quán cho khách Đặt bàn trước, Tra cứu chai rượu đang gửi tại quán, hoặc Tự nhập mã số thuế để lấy Hóa đơn đỏ (VAT). |
 
-### 1.2. Danh sách Mã PIN bàn giao ban đầu (Chủ quán có thể đổi lại bất cứ lúc nào)
+### 1.3. Danh sách Mã PIN bàn giao ban đầu (Chủ quán đổi lại ngay ở Bước 1)
 
 | Vị trí trong quán | Tên tài khoản mẫu | Mã PIN 4 số | Màn hình tự động mở ra sau khi bấm PIN |
 | --- | --- | --- | --- |
 | Chủ quán (Toàn quyền) | Nguyễn Văn Chủ | 1111 | Màn hình Quản lý Chủ quán (Xem lãi lỗ, duyệt yêu cầu, cài đặt quán) |
 | Kế toán | Lê Thị Kế Toán | 2222 | Màn hình Kế toán (Xem doanh thu, kho, bảng lương, báo cáo thuế) |
-| Thu ngân kiêm Quản lý ca | Trần Minh Thu | 3333 | Màn hình Máy Thu ngân tại quầy (Tính tiền, in bill, khóa sổ cuối ca) |
+| Thu ngân kiêm Quản lý ca | Trần Minh Thu | 3333 | Màn hình trên Laptop Quầy thu ngân (Tính tiền, in bill, khóa sổ cuối ca) |
 | Phục vụ bàn (Khu Sân vườn 1) | Phạm Thị Lan | 4444 | Màn hình Điện thoại Phục vụ (Phụ trách bàn A01 đến A06) |
 | Phục vụ bàn (Khu Sân vườn 2) | Đỗ Văn Nam | 4445 | Màn hình Điện thoại Phục vụ (Phụ trách bàn A07 đến A12) |
 | Phục vụ bàn (Trong nhà & VIP 1) | Vũ Thị Hoa | 4446 | Màn hình Điện thoại Phục vụ (Phụ trách bàn B01-B04 & Phòng VIP 1) |
 | Phục vụ bàn (Trong nhà & VIP 2) | Bùi Minh Đức | 4447 | Màn hình Điện thoại Phục vụ (Phụ trách bàn B05-B08 & Phòng VIP 2) |
 | Nhân viên PG Bia | Ngô Thanh Thảo | 5555 | Màn hình Điện thoại PG (Bán bia, tặng bia khuyến mãi, trả nắp cuối ca) |
-| Phụ trách Hồ hải sản | Hoàng Văn Long | 6666 | Màn hình Bếp & Hồ cá (Bắt cá, cân ký, báo cá chết, nhập/kiểm kho) |
-| Bếp trưởng | Đinh Văn Sơn | 7777 | Màn hình Bếp & Hồ cá (Nhận đơn món ăn, báo xong món, kiểm kho bếp) |
-| Tạp vụ | Lý Thị Mai | 8888 | Dùng để bấm Chấm công vào/ra ca tại máy tính bảng ở Bếp |
+| Phụ trách Hồ hải sản | Hoàng Văn Long | 6666 | Mở trên Điện thoại cá nhân (Bắt cá, nhập số ký cân, báo cá chết, kiểm kho) |
+| Bếp trưởng | Đinh Văn Sơn | 7777 | Mở trên Điện thoại cá nhân khi cần nhập kho / báo hỏng / kiểm kho cuối ca |
+| Tạp vụ | Lý Thị Mai | 8888 | Mở trên Điện thoại cá nhân để bấm Chấm công vào/ra ca bằng Camera trước |
 
 ---
 
-## PHẦN 2: 7 BƯỚC CHỦ QUÁN CÀI ĐẶT QUÁN LẦN ĐẦU TRƯỚC KHI BÁN THẬT
+## PHẦN 2: 8 BƯỚC CHỦ QUÁN CÀI ĐẶT QUÁN LẦN ĐẦU TRÊN CHIẾC LAPTOP TẠI QUẦY
 
-Trước ngày bắt đầu bán hàng thực tế, Chủ quán đăng nhập vào https://munbao.com/login bằng mã PIN 1111 và thực hiện lần lượt 7 bước dưới đây ngay trên màn hình (chỉ cần điền chữ và số, bấm Lưu là áp dụng ngay cho toàn quán).
+Trước ngày bắt đầu bán hàng thực tế, Chủ quán ngồi tại chiếc Laptop ở quầy (đang kết nối Wi-Fi của quán), đăng nhập https://munbao.com/login bằng mã PIN 1111 và thực hiện lần lượt 8 bước dưới đây.
 
-### Bước 1: Xóa số liệu mẫu để bắt đầu bán hàng thật
+### Bước 1: Xóa số liệu mẫu & Đổi ngay mã PIN bảo mật của Chủ quán
 
-- 1. Sau khi nhập mã PIN 1111, nhìn lên góc trên cùng bên phải màn hình, bấm vào nút 'Dữ liệu hệ thống'.
-- 2. Bấm vào dòng chữ màu xanh: 'Khởi tạo Quán Mới (Xóa dữ liệu mẫu để bán hàng thật)'.
-- 3. Bấm nút xác nhận 'Xóa dữ liệu mẫu & Bắt đầu bán thật'.
-- -> Ngay lập tức, toàn bộ các bàn ăn thử, hóa đơn mẫu và doanh thu mẫu sẽ được dọn sạch về 0. Sơ đồ bàn và thực đơn vẫn được giữ lại để bạn chỉnh sửa theo ý muốn ở Bước 2 đến Bước 7.
+- 1. Sau khi nhập mã PIN 1111, nhìn lên góc trên cùng bên phải màn hình, bấm nút 'Dữ liệu hệ thống' -> chọn 'Khởi tạo Quán Mới (Xóa dữ liệu mẫu để bán hàng thật)' -> xác nhận.
+- -> Toàn bộ bàn ăn thử và doanh thu mẫu về 0 tròn trĩnh, giữ nguyên sơ đồ bàn và khung thực đơn để chỉnh sửa tiếp.
+- 2. Vào mục 'Cài đặt' -> chọn nhóm 'Nhân viên và phân quyền' -> bấm Sửa dòng Chủ quán và ĐỔI NGAY mã PIN 1111 sang 4 số bí mật của riêng bạn.
 
-### Bước 2: Điền Tên quán, Wi-Fi in trên Bill & Số tài khoản Ngân hàng nhận tiền QR
+### Bước 2: Điền Tên quán, Wi-Fi khách & Tài khoản VietQR mở tự do số tiền nhận Tip
 
-- 1. Bấm vào mục 'Cài đặt' ở menu bên trái (hoặc nút 'Cài đặt' góc trên bên phải) -> Chọn mục số 7 'Máy in và mẫu bill'.
-- 2. Tại khung 'Thông tin quán': Điền Tên quán của bạn, Địa chỉ, Số điện thoại, Mã số thuế, Tên Wi-Fi và Mật khẩu Wi-Fi cho khách (thông tin này sẽ tự động in dưới chân tờ hóa đơn tính tiền).
-- 3. Kéo xuống khung 'Tài khoản nhận VietQR':
--    • Chọn Ngân hàng của bạn (Vietcombank, MB, Techcombank, ACB, BIDV, VietinBank...).
--    • Nhập Số tài khoản nhận tiền và Tên chủ tài khoản (viết chữ IN HOA không dấu).
--    • Nhìn sang hình mã QR bên cạnh để kiểm tra xem tên chủ tài khoản và ngân hàng đã hiện đúng chưa.
+- 1. Trong 'Cài đặt' -> chọn mục 'Máy in và mẫu bill' -> khung 'Thông tin quán': Điền Tên quán, Địa chỉ, Số điện thoại, Mã số thuế, Tên Wi-Fi và Mật khẩu Wi-Fi cho khách (tự động in ở chân hóa đơn).
+- 2. Kéo xuống khung 'Tài khoản nhận VietQR': Chọn Ngân hàng, nhập Số tài khoản và Tên chủ tài khoản (IN HOA không dấu).
+- 3. Cơ chế nhận Tiền Tip thông minh qua VietQR (đã bật sẵn mặc định):
+-    • Khi khách quét mã QR thanh toán, Nội dung chuyển khoản được khóa cố định theo mã riêng của bàn (ví dụ QN A05 KA05), còn ô Số tiền để mở tự do.
+-    • Nếu hóa đơn 460.000 đ và khách hài lòng nhập 500.000 đ, phần mềm tự động đối soát đúng bàn A05 và cộng 40.000 đ tiền dư vào Tiền Tip của nhân viên (riêng mã QR đặt cọc giữ bàn trước thì vẫn khóa cứng số tiền cọc).
 
-### Bước 3: Sắp xếp Sơ đồ bàn, Giá phòng VIP & Tiền cọc đặt bàn
+### Bước 3: Kết nối 02 Máy in bill (1 ở Thu ngân + 1 ở Bếp) với chiếc Laptop tại quán
 
-- Trong trang Cài đặt, bấm chọn mục số 1 'Bàn và đặt chỗ':
-- 1. Khung 'Khu vực và danh sách bàn': Bạn có thể đổi tên khu vực (ví dụ: Sân vườn, Trong nhà, Tầng 2, Phòng VIP), thêm bàn mới hoặc xóa bàn không dùng.
-- 2. Khung 'Sơ đồ bàn': Dùng ngón tay hoặc chuột kéo từng bàn đặt vào đúng vị trí thực tế ngoài quán để nhân viên nhìn vào màn hình là biết ngay bàn nào ở đâu.
-- 3. Khung 'Phòng VIP':
--    • Điền số tiền phụ thu mỗi giờ ngồi phòng VIP (ví dụ: 100.000 đ/giờ).
--    • Điền số phút đầu miễn phí (ví dụ: 15 phút đầu mới vào chưa tính giờ).
--    • Bật chế độ 'Miễn phụ thu khi đạt mức chi tối thiểu' và điền số tiền (ví dụ: 3.000.000 đ — nghĩa là bàn VIP ăn uống trên 3 triệu sẽ được miễn tiền giờ phòng VIP).
-- 4. Khung 'Đặt bàn trực tuyến': Điền mức tiền cọc khi khách đặt bàn qua mạng (ví dụ: Bàn thường cọc 200.000 đ, Phòng VIP cọc 500.000 đ) và thời gian chờ khách chuyển cọc (30 phút).
+- 1. Cắm dây cho máy in Bếp (cổng mạng LAN): Cắm dây nguồn và cắm dây mạng LAN từ máy in Bếp vào cục Wi-Fi của quán. Tắt nguồn máy in -> ấn giữ nút FEED đồng thời bật nguồn giữ 2 giây -> tờ giấy in ra ghi dòng 'IP Address' (ví dụ 192.168.1.201, cổng 9100).
+- 2. Cắm dây cho máy in Thu ngân (xem máy tại quầy dùng cổng gì):
+-    • Cách A (Máy in Thu ngân cũng cắm dây mạng LAN vào cục Wi-Fi — khuyên dùng): Lấy số IP tương tự (ví dụ 192.168.1.200, khác số đuôi với máy Bếp).
+-    • Cách B (Máy in Thu ngân cắm cáp USB thẳng vào chiếc Laptop): Cài Driver máy in trên Windows, đặt làm Default Printer (khổ 80mm).
+- 3. Vào 'Cài đặt' -> 'Máy in và mẫu bill':
+-    • Kéo xuống bảng 'Định tuyến phiếu bếp', bấm nút 'Thiết lập nhanh: 2 máy in (1 Thu ngân + 1 Bếp)' -> Phần mềm tự động gom mọi món ăn & hải sản về Máy in Bếp, còn hóa đơn & phiếu bia/nước về Máy in Thu ngân.
+-    • Lên bảng 'Máy in': Nhập IP của máy Bếp (ví dụ 192.168.1.201) vào dòng 'Máy in bếp nóng'. Ở dòng 'Máy in quầy thu ngân', nhập IP nếu dùng dây LAN (Cách A) hoặc để trống ô IP nếu cắm cáp USB vào Laptop (Cách B) -> Bấm 'Lưu và áp dụng'.
+- 4. Cài cầu nối in tự động trên Laptop (chỉ làm 1 lần duy nhất): Đảm bảo Laptop đã cài Python 3 (tích Add Python to PATH) -> Bấm nút 'Tải bộ kết nối máy in LAN (.zip)' ngay trên bảng Máy in -> Giải nén ra ổ C:\QuanNhau_MayIn_LAN -> Nhấp đúp 'CAI_TU_KHOI_DONG_CUNG_WINDOWS.bat' và 'CHAY_KET_NOI_MAY_IN_LAN.bat' -> Bấm biểu tượng 'In thử' để máy in Bếp nhả phiếu ngay!
+- 5. Nếu máy Thu ngân dùng cáp USB (Cách B): Chuột phải biểu tượng Google Chrome ngoài Desktop -> Properties -> thêm ' --kiosk-printing' vào cuối ô Target -> mở màn hình Thu ngân bấm 'Lịch sử in K80' bật nút 'Đang BẬT tự động in'.
+- 6. Chống ngủ đông trên Laptop: Vào Windows Settings -> Power & battery -> Screen and sleep -> chỉnh 'When plugged in, put my device to sleep' thành 'Never' để Laptop không tự ngủ làm gián đoạn lệnh in xuống Bếp.
 
-### Bước 4: Cập nhật Thực đơn, Giá bán, Túi nguyên liệu Bếp & Cách bán Hải sản bể
+### Bước 4: Khóa Chấm công thật 1 chạm tại quán (Wi-Fi quán + GPS + Selfie Camera trước)
 
-- Trong trang Cài đặt, bấm chọn mục số 2 'Thực đơn và định lượng':
-- 1. Khung 'Túi định lượng' (Khai báo nguyên liệu chia túi sẵn trong bếp): Điền các loại túi thịt/mực/ếch chia sẵn theo phần (ví dụ: Túi bò thăn 200g giá vốn 42.000đ, Túi mực lá 250g giá vốn 48.000đ). Việc này giúp phần mềm tự động trừ đúng 1 túi trong tủ đông mỗi khi khách gọi 1 đĩa đồ ăn.
-- 2. Khung 'Món ăn và đồ uống': Bấm '+ Thêm món' hoặc bấm vào món có sẵn để sửa Giá bán, Giá vốn. Nếu món nào tạm nghỉ bán trong ngày, chỉ cần gạt tắt nút 'Đang bán' là máy nhân viên sẽ ngừng nhận món đó.
-- 3. Khung 'Bán hải sản theo Gram & Khách ép giá nguyên con':
--    • Bật 'Cho phép gọi lẻ hải sản theo gram / cắt khúc' nếu quán bạn cho khách mua lẻ vài lạng cá/tôm (ví dụ khách mua 5 lạng cá mú nấu lẩu, phần cá còn dư phần mềm tự động nhớ ở lại trong bể).
--    • Bật 'Cho phép khách trả giá khi mua nguyên con' và điền mức % giảm tối đa cho phép nhân viên tự chốt tại bàn (ví dụ: 5%). Nếu khách đòi bớt nhiều hơn 5%, điện thoại của nhân viên sẽ không tự chốt được mà tự động gửi tin nhắn xin ý kiến sang màn hình của Quản lý hoặc Chủ quán.
+- 1. Dùng điện thoại của Chủ quán bắt đúng mạng Wi-Fi của quán, mở 'Cài đặt' -> 'Ca làm và lương' -> khung 'Chấm công và đi trễ'.
+- 2. Bấm nút 'Gắn IP Wi-Fi hiện tại làm mạng quán' và nút 'Lấy tọa độ GPS hiện tại làm vị trí quán' (bấm Cho phép Vị trí).
+- 3. Điền bán kính cho phép (ví dụ 50 m - 80 m), bật yêu cầu chụp ảnh Selfie và chọn quy chế chia Tiền Tip -> Bấm 'Lưu và áp dụng'.
+- -> Từ lúc này, nhân viên bắt buộc phải đứng tại quán, bắt Wi-Fi quán và chụp khuôn mặt trực tiếp bằng camera trước mới vào ca được.
 
-### Bước 5: Cài đặt Khuyến mãi Bia (Mua 10 tặng 1) & Chỉ tiêu hãng bia
+### Bước 5: Sắp xếp Sơ đồ bàn, Giá phòng VIP & Tiền cọc đặt bàn
 
-- Trong trang Cài đặt, bấm chọn mục số 3 'Khuyến mãi bia và PG':
-- 1. Khung 'Chương trình khuyến mãi': Cài đặt chương trình (ví dụ: Mua 10 lon Tiger tặng 1 lon), chọn bên chịu tiền bia tặng ('Quỹ hãng' — tiền hãng trả nên không làm giảm lãi của quán, hoặc 'Quán chịu') và bật nút 'Thu hồi nắp/vỏ lon' để bắt buộc cuối ca PG phải nộp đủ số nắp lon đã tặng cho Thu ngân.
-- 2. Khung 'Hãng bia và thưởng sản lượng': Điền sản lượng cam kết với hãng bia trong tháng/quý và số tiền thưởng hãng hứa trả để phần mềm tự đếm xem quán đã bán đạt bao nhiêu % chỉ tiêu.
+- Trong trang Cài đặt, bấm chọn mục 'Bàn và đặt chỗ':
+- 1. Đổi tên khu vực (Sân vườn, Trong nhà, Phòng VIP...), thêm/xóa bàn và kéo từng bàn vào đúng vị trí thực tế ngoài quán.
+- 2. Điền giá phụ thu mỗi giờ ngồi phòng VIP và mức chi tối thiểu được miễn tiền giờ phòng VIP (ví dụ ăn trên 3.000.000 đ tự miễn phí phòng).
+- 3. Điền mức tiền cọc khi khách đặt bàn trực tuyến (mã QR đặt cọc sẽ tự khóa cứng đúng số tiền cọc này).
 
-### Bước 6: Tạo tài khoản Nhân viên, Đổi mã PIN Chủ quán & Chọn cách chia Tiền Tip
+### Bước 6: Cập nhật Thực đơn, Giá bán, Túi nguyên liệu Bếp & Cách bán Hải sản bể
 
-- 1. Chọn mục số 5 'Ca làm và lương':
--    • Chỉnh lại giờ vào ca / tan ca, số phút đi trễ cho phép (ví dụ trễ quá 10 phút phạt 2.000 đ/phút).
--    • Chọn 'Quy chế chia Tiền Tip mặc định' khi khách chuyển khoản dư tiền bo cho nhân viên: (1) Ai đứng bàn đó hưởng 100%, hoặc (2) Chia đều cho toàn bộ phục vụ trong ca, hoặc (3) Chia trong tổ phụ trách khu vực đó.
-- 2. Chọn mục số 6 'Nhân viên và phân quyền':
--    • Tại khung 'Nhân viên': Bấm vào tài khoản Nguyễn Văn Chủ (Chủ quán) và ĐỔI NGAY mã PIN 1111 sang 4 số bí mật của riêng bạn để không ai trong quán tự ý vào màn hình Chủ quán được.
--    • Bấm '+ Thêm nhân viên' để nhập tên nhân viên thật của quán, chọn vị trí làm việc, mức lương, chọn khu vực bàn giao cho nhân viên đó đứng và cấp cho mỗi người 1 mã PIN 4 số.
+- Trong trang Cài đặt, bấm chọn mục 'Thực đơn và định lượng':
+- 1. Khung 'Túi định lượng': Khai báo các loại túi thịt/mực/ếch chia sẵn trong bếp để khách gọi 1 đĩa phần mềm tự trừ đúng 1 túi.
+- 2. Khung 'Món ăn và đồ uống': Chỉnh sửa Giá bán, Giá vốn, kiểu chế biến hải sản cân ký.
+- 3. Khung 'Bán hải sản theo Gram & Khách ép giá nguyên con': Bật cho phép bán lẻ theo gram và quy định % giảm tối đa nhân viên được tự chốt tại bàn.
 
-### Bước 7: Giao hạn mức tự xử lý cho Thu ngân kiêm Quản lý & Bấm Lưu
+### Bước 7: Cài đặt Khuyến mãi Bia (Mua 10 tặng 1) & Chỉ tiêu hãng bia
 
-- 1. Vẫn tại mục số 6 'Nhân viên và phân quyền', kéo xuống khung 'Phân quyền theo vai trò':
--    • Tại cột 'Thu ngân kiêm Quản lý', bạn có thể quy định rõ những việc nhỏ Quản lý ca được tự giải quyết tại quầy mà không cần làm phiền Chủ quán (ví dụ: tự giảm giá tối đa 10%, tự duyệt hủy món dưới 200.000 đ, tự duyệt hàng hỏng dưới 300.000 đ, tự cho nhân viên ứng lương dưới 500.000 đ).
--    • Mọi trường hợp vượt quá số tiền này sẽ tự động bị chặn tại quầy và đẩy thẳng về điện thoại của Chủ quán.
-- 2. Sau khi chỉnh xong, bấm nút màu cam 'Lưu và áp dụng' ở góc dưới cùng bên phải màn hình -> Chọn 'Áp dụng ngay' là hoàn tất!
+- Trong trang Cài đặt, bấm chọn mục 'Khuyến mãi bia và PG':
+- 1. Cài đặt chương trình (ví dụ Mua 10 tặng 1), chọn bên chịu chi phí ('Quỹ hãng' hoặc 'Quán chịu') và bật 'Thu hồi nắp/vỏ lon' để cuối ca PG nộp đủ nắp cho Thu ngân.
+- 2. Điền sản lượng cam kết với hãng bia trong tháng/quý để phần mềm tự theo dõi % tiến độ nhận thưởng.
+
+### Bước 8: Tạo tài khoản Nhân viên thật & Giao hạn mức cho Thu ngân kiêm Quản lý
+
+- Trong trang Cài đặt, bấm chọn mục 'Nhân viên và phân quyền':
+- 1. Bấm '+ Thêm nhân viên' để nhập tên nhân viên thật của quán, chọn vị trí làm việc, mức lương, khu vực phụ trách và cấp mã PIN 4 số riêng.
+- 2. Tại khung 'Phân quyền theo vai trò', chỉnh hạn mức việc nhỏ mà Thu ngân kiêm Quản lý ca được tự xử lý tại quầy (vượt hạn mức sẽ tự động đẩy về điện thoại Chủ quán).
+- 3. Bấm nút màu cam 'Lưu và áp dụng' ở góc dưới cùng bên phải màn hình là hoàn tất!
 
 ---
 
 ## PHẦN 3: HƯỚNG DẪN CHỦ QUÁN GIAO VIỆC HẰNG NGÀY CHO TỪNG BỘ PHẬN
 
-Để quán vận hành trơn tru và chống thất thoát tuyệt đối, Chủ quán chỉ cần hướng dẫn mỗi bộ phận làm đúng các thao tác đơn giản trên màn hình của bộ phận đó như sau:
+Với mô hình 01 Laptop tại quầy + 02 Máy in bill (Thu ngân & Bếp) + Điện thoại cá nhân nhân viên, mỗi bộ phận thao tác hằng ngày cực kỳ gọn nhẹ như sau:
 
 ### 3.1. Bảng phân công thao tác hằng ngày theo từng vị trí nhân viên
 
 | Vị trí nhân viên | Thao tác bắt buộc trong ca làm việc |
 | --- | --- |
-| 1. Phục vụ bàn<br>(Dùng điện thoại cá nhân) | • Đầu ca: Mở https://munbao.com/login -> Nhập mã PIN 4 số -> Bấm 'Chấm công vào ca'.<br>• Khi khách vào: Chạm vào bàn trống -> Chọn số lượng khách -> Chọn món khách gọi.<br>• Khi khách gọi Hải sản sống tại bể: Chạm vào món cá/tôm -> Chọn đúng mã số con cá khách chỉ tay bắt tại bể (hoặc nhập số gram nếu khách mua lẻ, hoặc nhập giá khách trả nếu khách mặc cả) -> Bấm 'Gửi bếp'.<br>• Khi khách gọi tính tiền tại bàn: Bấm nút 'Thanh toán tại bàn' để mở mã QR có sẵn số tiền của bàn đó đưa khách quét. Khi khách chuyển khoản xong, màn hình tự báo thành công. |
-| 2. Nhân viên PG Bia<br>(Dùng điện thoại cá nhân) | • Mở https://munbao.com/login -> Nhập mã PIN của PG.<br>• Khi rót thêm bia cho bàn nào, chạm vào bàn đó bấm cộng số lon bia.<br>• Khi bàn uống đủ số lon được tặng (ví dụ đủ 10 lon), bấm nút 'Tặng bia khuyến mãi' và giữ lại nắp lon.<br>• Cuối ca: Mang toàn bộ nắp lon bia khuyến mãi nộp lại cho Thu ngân kiểm đếm. |
-| 3. Nhân viên Hồ cá & Bếp<br>(Dùng máy tính bảng treo tại Bếp/Bể cá) | • Khi nhập hàng mới về: Mở mục 'Nhập & Kiểm kho' -> Hai người cùng đếm và nhập số lượng túi nguyên liệu bếp, số két bia và số con cá mới thả vào bể.<br>• Trong giờ bán hàng: Nhìn màn hình 'Đơn bếp & Bể cá', món nào làm xong bấm nút 'Hoàn tất' để báo cho Phục vụ ra bưng.<br>• Khi có cá chết hoặc đồ ăn bị hỏng: Vào mục 'Báo hỏng nguyên liệu' -> Chọn tên nguyên liệu hoặc mã con cá chết -> Bấm nút 'Tải ảnh / Camera' chụp hình thực tế con cá chết -> Bấm Gửi cho Chủ quán duyệt.<br>• Cuối ca tối: Vào mục 'Kiểm kho cuối ca' -> Đếm thực tế trong bể còn mấy con cá, trong tủ còn mấy túi thịt, mấy lon bia rồi nhập vào máy và bấm Nộp. |
-| 4. Thu ngân kiêm Quản lý ca<br>(Ngồi tại máy tính Quầy thu ngân) | • Đầu ca: Nhập số tiền mặt lẻ có sẵn trong ngăn kéo.<br>• Trong ca: In phiếu tạm tính cho khách (lưu ý: ngay khi bấm In tạm tính, hóa đơn sẽ tự động khóa lại, không ai tự ý xóa bớt món để bỏ túi tiền thừa được). Thu tiền mặt hoặc quét QR tại quầy; giải quyết các việc nhỏ trong phạm vi Chủ quán cho phép.<br>• Cuối ca: Đếm số nắp bia của PG nộp lại; đếm số tờ tiền mặt trong két theo từng mệnh giá (bao nhiêu tờ 500k, 200k, 100k...) nhập vào máy và bấm 'Khóa sổ kết ca'. |
+| 1. Phục vụ bàn<br>(Dùng điện thoại cá nhân) | • Đầu ca: Bắt Wi-Fi quán -> Mở https://munbao.com/login -> Nhập mã PIN 4 số -> Chụp ảnh mặt Camera trước + GPS để Chấm công vào ca.<br>• Khi khách vào: Chạm vào bàn trống -> Chọn số khách -> Chọn món ăn & bia bấm 'Gửi bếp' (Máy in Bếp tự nhả phiếu món ăn, Máy in Thu ngân nhả phiếu xuất bia/nước).<br>• Khi khách gọi Hải sản sống tại bể: Chọn con cá theo mã hoặc chờ người phụ trách Hồ cá cân ký.<br>• Khi khách tính tiền tại bàn: Mở mã VietQR của bàn đưa khách quét (nội dung chuyển khoản đã khóa sẵn mã bàn, ô số tiền mở tự do để khách có thể nhập dư cho thêm Tiền Tip). |
+| 2. Nhân viên PG Bia<br>(Dùng điện thoại cá nhân) | • Mở https://munbao.com/login -> Nhập mã PIN PG -> Chấm công bằng Camera trước.<br>• Khi rót thêm bia cho bàn nào, chạm vào bàn đó bấm cộng số lon bia.<br>• Khi bàn uống đủ điều kiện khuyến mãi (ví dụ đủ 10 lon), bấm 'Tặng bia khuyến mãi' và thu hồi nắp lon nộp cho Thu ngân cuối ca. |
+| 3. Phụ trách Hồ cá & Bếp<br>(Dùng điện thoại cá nhân + 01 Máy in LAN tại Bếp) | • Trong Khu Bếp nấu: Đầu bếp KHÔNG cần dùng điện thoại hay màn hình — cứ nghe máy in nhiệt K80 kêu bíp và tự cắt phiếu ra là xé phiếu chế biến theo đúng số bàn.<br>• Tại Hồ hải sản (mở PIN 6666 trên điện thoại cá nhân): Khi có lệnh bắt cá, đặt cá lên cân rồi gõ số ký bấm Xác nhận -> Máy in trong Bếp lập tức tự nhả phiếu chế biến kèm số ký.<br>• Khi nhập hàng / có cá chết / cuối ca: Dùng điện thoại cá nhân (PIN 6666 hoặc 7777) để nhập kho, chụp ảnh thực tế con cá chết gửi Chủ quán duyệt và nhập số đếm kiểm kho mù cuối tối. |
+| 4. Thu ngân kiêm Quản lý ca<br>(Ngồi tại chiếc Laptop ở Quầy thu ngân) | • Đầu ca: Bật nguồn chiếc Laptop tại quầy (giữ Laptop cắm sạc và luôn mở trong suốt ca bán để truyền lệnh in cho toàn quán), nhập số tiền mặt lẻ đầu ca.<br>• Trong ca: Bấm In tạm tính trên máy in Thu ngân (hóa đơn lập tức tự khóa chống sửa món gian lận), thu tiền mặt / đối soát chuyển khoản VietQR và xử lý các việc nhỏ trong hạn mức.<br>• Cuối ca: Nhận nắp bia từ PG, kiểm đếm tờ tiền mặt theo mệnh giá và bấm 'Khóa sổ kết ca (Z-Report)'. |
 
 ---
 
