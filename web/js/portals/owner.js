@@ -12,7 +12,24 @@
   // Quyen chinh sua cai dat (trang Cai dat dung ham nay, co fallback rieng)
   App.ownerCanEdit = () => App.role() === "owner" || Engine.can("accountant", "editSettings");
 
-  const S = () => App.state(P, { range: "today", appTab: "pending", appScope: "all", appType: "all", sel: {}, salesTab: "pl", invTab: "recon", invDay: "", month: "", chart: "", _rejDeduct: false });
+  const S = () => App.state(P, {
+    range: "",
+    _rangeManual: false,
+    customFrom: "",
+    customTo: "",
+    appTab: "pending",
+    appScope: "all",
+    appType: "all",
+    sel: {},
+    salesTab: "pl",
+    salesQ: "",
+    salesPay: "all",
+    invTab: "recon",
+    invDay: "",
+    month: "",
+    chart: "",
+    _rejDeduct: false,
+  });
   const D = () => Store.data;
   const C = () => Store.config;
 
@@ -32,9 +49,12 @@
 
   const RANGES = [
     { value: "today", label: "Hôm nay" },
+    { value: "yesterday", label: "Hôm qua" },
     { value: "7d", label: "7 ngày" },
+    { value: "30d", label: "30 ngày" },
     { value: "month", label: "Tháng này" },
     { value: "lastmonth", label: "Tháng trước" },
+    { value: "custom", label: "Tùy chọn" },
   ];
   const TYPE_TONE = { unlock_bill: "danger", void_item: "danger", discount: "warning", wastage: "warning", advance: "primary", overtime: "info", count_variance: "danger", noshow_deposit: "violet" };
   const LOW_RISK_TYPES = ["wastage", "overtime", "void_item"];
@@ -89,10 +109,32 @@
   /* ---------- Bo loc thoi gian thong nhat ---------- */
   function range() {
     const st = S();
-    if (!RANGES.some((r) => r.value === st.range)) st.range = "today";
-    const [from, to] = Engine.rangeKeys(st.range);
-    const label = st.range === "today" ? "Hôm nay" : st.range === "7d" ? "7 ngày qua" : U.monthLabel(from);
-    return { from, to, n: daysBetween(from, to), label, preset: st.range };
+    let preset = st.range;
+    if (!st._rangeManual || !RANGES.some((r) => r.value === preset)) {
+      const today = U.dayKey();
+      if (Engine.liveDay(today).bills > 0) preset = "today";
+      else if ((D().sales || []).length > 0 || (D().dailyStats || []).some((d) => d.revenue > 0)) {
+        const [f7, t7] = Engine.rangeKeys("7d");
+        preset = Engine.summarize(Engine.days(f7, t7)).bills > 0 ? "7d" : "month";
+      } else preset = "today";
+    }
+    let from, to, label;
+    if (preset === "custom") {
+      const today = U.dayKey();
+      if (!st.customFrom) st.customFrom = shiftKey(today, -6);
+      if (!st.customTo) st.customTo = today;
+      from = st.customFrom <= st.customTo ? st.customFrom : st.customTo;
+      to = st.customFrom <= st.customTo ? st.customTo : st.customFrom;
+      label = from === to ? "Ngày " + U.dayLabel(from) : U.dayLabel(from) + " – " + U.dayLabel(to);
+    } else {
+      [from, to] = Engine.rangeKeys(preset);
+      if (preset === "today") label = "Hôm nay (" + U.dayLabel(from) + ")";
+      else if (preset === "yesterday") label = "Hôm qua (" + U.dayLabel(from) + ")";
+      else if (preset === "7d") label = "7 ngày qua";
+      else if (preset === "30d") label = "30 ngày qua";
+      else label = U.monthLabel(from);
+    }
+    return { from, to, n: Math.max(1, daysBetween(from, to)), label, preset };
   }
   function prevRange(r) {
     let out;
@@ -103,14 +145,33 @@
       if (r.preset === "month") { const t2 = shiftKey(from, r.n - 1); if (t2 < to) to = t2; }
       out = { from, to };
     } else out = { from: shiftKey(r.from, -r.n), to: shiftKey(r.to, -r.n) };
-    out.label = r.preset === "today" ? "cả ngày hôm qua" : r.preset === "7d" ? "7 ngày trước đó" : r.preset === "month" ? "cùng kỳ tháng trước" : "tháng trước đó";
+    out.label =
+      r.preset === "today" ? "cả ngày hôm qua"
+      : r.preset === "yesterday" ? "ngày hôm kia"
+      : r.preset === "7d" ? "7 ngày trước đó"
+      : r.preset === "30d" ? "30 ngày trước đó"
+      : r.preset === "month" ? "cùng kỳ tháng trước"
+      : r.preset === "lastmonth" ? "tháng trước đó"
+      : r.n + " ngày trước đó";
     return out;
   }
-  const rangeSeg = () => '<div class="range-seg">' + UI.seg(RANGES, S().range, "owner.range") + "</div>";
+  function rangeSeg() {
+    const r = range();
+    const customPickers = r.preset === "custom"
+      ? '<div class="custom-dates">' +
+        '<span class="small muted">Từ</span>' +
+        UI.input({ type: "date", change: "owner.customFrom", value: r.from, cls: "date-input" }) +
+        '<span class="small muted">đến</span>' +
+        UI.input({ type: "date", change: "owner.customTo", value: r.to, cls: "date-input" }) +
+        "</div>"
+      : "";
+    return '<div class="range-bar"><div class="range-seg">' + UI.seg(RANGES, r.preset, "owner.range") + "</div>" + customPickers + "</div>";
+  }
 
   /* ---------- Thang ---------- */
   function months() {
-    const set = new Set(D().dailyStats.map((d) => d.dayKey.slice(0, 7)));
+    const set = new Set((D().dailyStats || []).map((d) => d.dayKey.slice(0, 7)));
+    (D().sales || []).forEach((s) => { if (s && s.dayKey) set.add(s.dayKey.slice(0, 7)); });
     set.add(U.monthKey());
     return Array.from(set).sort().reverse();
   }
@@ -289,13 +350,21 @@
     }
     const shiftCard = card("Két tiền mặt ca hiện tại", shiftBody, { icon: "banknote" });
 
-    const sumText = "Hôm nay đến " + U.time(Date.now()) + ": doanh thu <b>" + U.money(live.revenue) + "</b> từ " + U.num(live.bills) + " bill, đang phục vụ " + U.num(live.openTickets) + " bàn (" + U.moneyShort(live.openValue) + "). " +
+    const recent7 = Engine.summarize(Engine.days(shiftKey(today, -6), today));
+    const sumText = "Hôm nay đến " + U.time(Date.now()) + ": doanh thu <b>" + U.money(live.revenue) + "</b> từ " + U.num(live.bills) + " bill" +
+      (!hasToday && recent7.bills ? " (7 ngày qua: <b>" + U.money(recent7.revenue) + "</b> · " + U.num(recent7.bills) + " bill)" : "") +
+      ", đang phục vụ " + U.num(live.openTickets) + " bàn (" + U.moneyShort(live.openValue) + "). " +
       (ownerPend.length ? "Có <b>" + ownerPend.length + " vấn đề lớn chờ Chủ quán</b>" : "Không có vấn đề lớn tồn đọng") +
       (cashierPend.length ? " (cùng " + cashierPend.length + " việc nhỏ thuộc thẩm quyền Thu ngân kiêm Quản lý)" : "") +
       (dangerN ? " và <b>" + dangerN + " cảnh báo nghiêm trọng</b> cần xem." : alerts.length ? ", " + alerts.length + " cảnh báo cần theo dõi." : ", không có cảnh báo.");
 
     return '<div class="page">' +
-      head("Tổng quan", U.weekday(U.dayStart(today)) + ", " + U.dayLabel(today) + " · cập nhật lúc " + U.time(Date.now()), '<span class="live-dot">' + I("refresh-cw", "ic-sm") + "Số liệu trực tiếp</span>") +
+      head(
+        "Tổng quan",
+        U.weekday(U.dayStart(today)) + ", " + U.dayLabel(today) + " · cập nhật lúc " + U.time(Date.now()),
+        UI.btn("Thống kê & Xuất CSV", { size: "sm", icon: "download", act: "owner.quickSalesRange", data: { range: hasToday ? "today" : "7d" } }) +
+          '<span class="live-dot">' + I("refresh-cw", "ic-sm") + "Số liệu trực tiếp</span>"
+      ) +
       summary(sumText, dangerN ? "warning" : "") + kpis +
       '<div class="ov-grid">' + apCard + alCard + "</div>" +
       chartCard +
@@ -391,16 +460,266 @@
   }
 
 
-  /* ======================= 3. BAN HANG VA LAI LO ======================= */
+  /* ======================= 3. BAN HANG, THONG KE DOANH THU VA LAI LO ======================= */
+  function saleItemsText(s) {
+    return (s.lines || [])
+      .filter((ln) => ln.status !== "void")
+      .map((ln) => (ln.kg ? U.num(ln.kg, 2) + "kg " : (ln.qty || 1) + "x ") + ln.name + (ln.isFree ? " (Tặng)" : ""))
+      .join("; ");
+  }
+  function salePayLabel(s) {
+    if (s.paymentSource === "webhook_qr") return "Auto Webhook QR";
+    if (s.cashAmt > 0 && s.qrAmt > 0) return "Kết hợp (TM + QR)";
+    if (s.qrAmt > 0) return "Chuyển khoản VietQR";
+    if (s.cardAmt > 0) return "Thẻ";
+    return "Tiền mặt";
+  }
+  function filterSalesList(sales, st) {
+    const pay = st.salesPay || "all";
+    const q = (st.salesQ || "").trim();
+    return (sales || []).filter((s) => {
+      if (pay === "cash" && !(s.cashAmt > 0)) return false;
+      if (pay === "qr" && !(s.qrAmt > 0)) return false;
+      if (pay === "tip" && !((s.tip || 0) > 0)) return false;
+      if (q) {
+        const hay = [
+          s.id,
+          s.payCode || "",
+          s.tableCode || s.tableId || "",
+          s.areaName || "",
+          Engine.staffName(s.waiterId),
+          Engine.staffName(s.cashierId),
+          saleItemsText(s),
+        ].join(" ");
+        if (!U.match(hay, q)) return false;
+      }
+      return true;
+    });
+  }
+  function buildItemStats(fromKey, toKey) {
+    const topMap = {};
+    Engine.topItems(fromKey, toKey, 500).forEach((t) => { topMap[t.menuId] = t; });
+    const seen = new Set();
+    const out = C().menu.map((m) => {
+      seen.add(m.id);
+      const prc = Number(m.kind === "seafood" ? m.pricePerKg : m.price) || 0;
+      const cst = Number(m.kind === "seafood" ? m.costPerKg : m.cost) || 0;
+      const mg = prc ? ((prc - cst) / prc) * 100 : 0;
+      const stat = topMap[m.id] || { qty: 0, freeQty: 0, kg: 0, amount: 0, cost: 0 };
+      const qVal = m.kind === "seafood" ? stat.kg : stat.qty;
+      const cat = (C().categories.find((c) => c.id === m.categoryId) || {}).name || "";
+      return { id: m.id, m, name: m.name, cat, unit: m.unit || (m.kind === "seafood" ? "kg" : "phần"), isSeafood: m.kind === "seafood", prc, cst, mg, qty: qVal, freeQty: stat.freeQty || 0, rev: stat.amount || 0, totalCost: stat.cost || 0, profit: (stat.amount || 0) - (stat.cost || 0) };
+    });
+    Object.keys(topMap).forEach((mid) => {
+      if (seen.has(mid)) return;
+      const stat = topMap[mid];
+      const qVal = stat.kg > 0 ? stat.kg : stat.qty;
+      out.push({ id: mid, m: { id: mid, name: stat.name, kind: stat.kg > 0 ? "seafood" : "kitchen", unit: stat.kg > 0 ? "kg" : "phần" }, name: stat.name, cat: "Món khác", unit: stat.kg > 0 ? "kg" : "phần", isSeafood: stat.kg > 0, prc: 0, cst: 0, mg: stat.amount ? ((stat.amount - stat.cost) / stat.amount) * 100 : 0, qty: qVal, freeQty: stat.freeQty || 0, rev: stat.amount || 0, totalCost: stat.cost || 0, profit: (stat.amount || 0) - (stat.cost || 0) });
+    });
+    return out.sort((a, b) => b.rev - a.rev || b.qty - a.qty || a.mg - b.mg);
+  }
+  function csvMetaHeader(title, r) {
+    const me = App.me();
+    return [
+      [title],
+      ["Đơn vị", C().store.name || "Quán Nhậu OS", "Điện thoại", C().store.phone || "", "Địa chỉ", C().store.address || ""],
+      ["Kỳ thống kê", r.label, "Từ ngày", U.dayLabel(r.from), "Đến ngày", U.dayLabel(r.to)],
+      ["Thời điểm xuất", U.dateTime(Date.now()), "Người xuất", me ? me.name : ""],
+      [],
+    ];
+  }
+  function exportSalesDailyCsv() {
+    const r = range();
+    const days = Engine.days(r.from, r.to);
+    const sum = Engine.summarize(days);
+    const rows = csvMetaHeader("BẢNG KÊ THỐNG KÊ DOANH THU BÁN HÀNG THEO NGÀY", r);
+    rows.push([
+      "Ngày", "Thứ", "Số hóa đơn", "Lượt khách",
+      "Doanh thu đồ ăn & bếp (đ)", "Doanh thu bia rượu & đồ uống (đ)", "Phụ thu VIP (đ)", "Giảm giá (đ)",
+      "Doanh thu thuần (đ)", "Thu tiền mặt (đ)", "Thu chuyển khoản VietQR (đ)", "Tiền Tip (đ)",
+      "Giá vốn COGS (đ)", "Lãi gộp (đ)", "Biên lãi gộp (%)",
+      "Hao hụt đã duyệt (đ)", "Chi phí nhân công (đ)", "Chi phí phụ phẩm (đ)", "Lợi nhuận ròng ước tính (đ)", "Trạng thái sổ",
+    ]);
+    days.forEach((d) => {
+      const gross = (Number(d.revenue) || 0) - (Number(d.cogs) || 0);
+      const net = gross - (Number(d.wastage) || 0) - (Number(d.labor) || 0) - (Number(d.utility) || 0);
+      const mg = d.revenue ? Number(((gross / d.revenue) * 100).toFixed(1)) : 0;
+      const statusText = d.dayKey === U.dayKey() ? "Đang bán hôm nay" : d.live && d.bills > 0 ? "Chưa chốt ca" : d.locked ? "Đã khóa sổ ca" : d.bills > 0 ? "Đã ghi nhận" : "Không phát sinh";
+      rows.push([
+        U.dayLabel(d.dayKey), U.weekday(U.dayStart(d.dayKey)), d.bills || 0, d.guests || 0,
+        d.food || 0, d.alcohol || 0, d.vipFee || 0, d.discount || 0,
+        d.revenue || 0, d.cash || 0, d.qr || 0, d.tips || 0,
+        d.cogs || 0, gross, mg,
+        d.wastage || 0, d.labor || 0, d.utility || 0, net, statusText,
+      ]);
+    });
+    rows.push([
+      "TỔNG CỘNG", days.length + " ngày", sum.bills, sum.guests,
+      sum.food, sum.alcohol, sum.vipFee, sum.discount,
+      sum.revenue, sum.cash, sum.qr, sum.tips,
+      sum.cogs, sum.gross, Number((sum.margin || 0).toFixed(1)),
+      sum.wastage, sum.labor, sum.utility, sum.net, "",
+    ]);
+    const span = r.from === r.to ? r.from : r.from + "_den_" + r.to;
+    U.downloadCsv("bang_ke_doanh_thu_ngay_" + span + ".csv", rows);
+    App.toast("Đã xuất bảng kê doanh thu theo ngày (" + r.label + ")", "success");
+  }
+  function exportSalesInvoicesCsv(onlyFiltered) {
+    const st = S();
+    const r = range();
+    const bk = Engine.salesBreakdown(r.from, r.to);
+    const list = onlyFiltered ? filterSalesList(bk.sales, st) : bk.sales;
+    const rows = csvMetaHeader("BẢNG KÊ CHI TIẾT HÓA ĐƠN BÁN HÀNG", r);
+    rows.push([
+      "STT", "Mã hóa đơn", "Mã định danh QR", "Ngày vận hành", "Giờ mở bàn", "Giờ thanh toán",
+      "Bàn", "Khu vực", "Số khách", "Phục vụ", "Thu ngân", "Phương thức thanh toán", "Chi tiết món đã gọi",
+      "Tiền đồ ăn (đ)", "Tiền bia rượu (đ)", "Phụ thu VIP (đ)", "Giảm giá (đ)", "Đặt cọc trừ bill (đ)",
+      "Tổng doanh thu thuần (đ)", "Thu tiền mặt (đ)", "Thu chuyển khoản QR (đ)", "Tiền Tip (đ)",
+      "Thuế GTGT đồ ăn (đ)", "Thuế GTGT bia rượu (đ)", "Giá vốn (đ)", "Lãi gộp (đ)", "Hóa đơn điện tử",
+    ]);
+    list.forEach((s, idx) => {
+      const tb = Engine.table(s.tableId);
+      const einv = s.einvoice || (D().einvoices || []).find((e) => e.saleId === s.id);
+      rows.push([
+        idx + 1,
+        s.id,
+        s.payCode || "",
+        U.dayLabel(s.dayKey || U.dayKey(s.closedAt)),
+        s.openedAt ? U.time(s.openedAt) : "",
+        s.closedAt ? U.time(s.closedAt) : "",
+        tb ? tb.code : s.tableCode || s.tableId || "",
+        s.areaName || "",
+        s.guests || 0,
+        Engine.staffName(s.waiterId),
+        Engine.staffName(s.cashierId),
+        salePayLabel(s),
+        saleItemsText(s),
+        s.foodAmt || 0,
+        s.alcoholAmt || 0,
+        s.vipFee || 0,
+        s.discount || 0,
+        s.deposit || 0,
+        s.grand || 0,
+        s.cashAmt || 0,
+        s.qrAmt + (s.cardAmt || 0),
+        s.tip || 0,
+        s.vatFood || 0,
+        s.vatAlcohol || 0,
+        s.cost || 0,
+        s.grossProfit || 0,
+        einv ? (einv.invoiceNo || einv.no || "Đã xuất") : "Chưa xuất",
+      ]);
+    });
+    rows.push([
+      "TỔNG CỘNG", list.length + " hóa đơn", "", "", "", "",
+      "", "", U.sum(list, (s) => s.guests || 0), "", "", "", "",
+      U.sum(list, (s) => s.foodAmt || 0),
+      U.sum(list, (s) => s.alcoholAmt || 0),
+      U.sum(list, (s) => s.vipFee || 0),
+      U.sum(list, (s) => s.discount || 0),
+      U.sum(list, (s) => s.deposit || 0),
+      U.sum(list, (s) => s.grand || 0),
+      U.sum(list, (s) => s.cashAmt || 0),
+      U.sum(list, (s) => (s.qrAmt || 0) + (s.cardAmt || 0)),
+      U.sum(list, (s) => s.tip || 0),
+      U.sum(list, (s) => s.vatFood || 0),
+      U.sum(list, (s) => s.vatAlcohol || 0),
+      U.sum(list, (s) => s.cost || 0),
+      U.sum(list, (s) => s.grossProfit || 0),
+      "",
+    ]);
+    const span = r.from === r.to ? r.from : r.from + "_den_" + r.to;
+    U.downloadCsv("bang_ke_chi_tiet_hoa_don_" + span + ".csv", rows);
+    App.toast("Đã xuất bảng kê " + list.length + " hóa đơn (" + r.label + ")", "success");
+  }
+  function exportSalesItemsCsv() {
+    const r = range();
+    const items = buildItemStats(r.from, r.to);
+    const rows = csvMetaHeader("BẢNG KÊ SẢN LƯỢNG, DOANH THU & BIÊN LÃI THEO MÓN", r);
+    rows.push([
+      "STT", "Mã món", "Tên món", "Danh mục", "Đơn vị",
+      "Giá bán chuẩn (đ)", "Giá vốn chuẩn (đ)", "Biên lãi chuẩn (%)",
+      "Sản lượng bán", "Sản lượng tặng KM", "Doanh thu (đ)", "Tổng giá vốn (đ)", "Lãi gộp (đ)", "Biên lãi thực tế (%)",
+    ]);
+    items.forEach((x, idx) => {
+      const realMg = x.rev ? Number(((x.profit / x.rev) * 100).toFixed(1)) : Number((x.mg || 0).toFixed(1));
+      rows.push([
+        idx + 1, x.id, x.name, x.cat, x.unit,
+        x.prc, x.cst, Number((x.mg || 0).toFixed(1)),
+        x.isSeafood ? Number((x.qty || 0).toFixed(2)) : (x.qty || 0),
+        x.freeQty || 0,
+        x.rev, x.totalCost, x.profit, realMg,
+      ]);
+    });
+    const totRev = U.sum(items, (x) => x.rev);
+    const totCost = U.sum(items, (x) => x.totalCost);
+    const totProfit = totRev - totCost;
+    rows.push([
+      "TỔNG CỘNG", items.length + " món", "", "", "",
+      "", "", "",
+      "", U.sum(items, (x) => x.freeQty || 0),
+      totRev, totCost, totProfit, totRev ? Number(((totProfit / totRev) * 100).toFixed(1)) : 0,
+    ]);
+    const span = r.from === r.to ? r.from : r.from + "_den_" + r.to;
+    U.downloadCsv("bang_ke_doanh_thu_mon_" + span + ".csv", rows);
+    App.toast("Đã xuất bảng kê doanh thu theo món (" + r.label + ")", "success");
+  }
+  function exportSalesPlCsv() {
+    const r = range();
+    const pr = prevRange(r);
+    const cur = Engine.summarize(Engine.days(r.from, r.to));
+    const prev = Engine.summarize(Engine.days(pr.from, pr.to));
+    const rows = csvMetaHeader("BÁO CÁO KẾT QUẢ KINH DOANH (P&L)", r);
+    rows.push(["Chỉ tiêu", "Kỳ hiện tại (" + r.label + ") (đ)", "Tỷ trọng doanh thu (%)", "Kỳ so sánh (" + pr.label + ") (đ)", "Chênh lệch (đ)"]);
+    const lines = [
+      ["Doanh thu đồ ăn & bếp", cur.food, pct(cur.food, cur.revenue), prev.food],
+      ["Doanh thu bia, rượu & đồ uống", cur.alcohol, pct(cur.alcohol, cur.revenue), prev.alcohol],
+      ["Phụ thu phòng VIP", cur.vipFee, pct(cur.vipFee, cur.revenue), prev.vipFee],
+      ["Giảm giá trực tiếp trên bill", -cur.discount, -pct(cur.discount, cur.revenue), -prev.discount],
+      ["Tổng doanh thu thuần", cur.revenue, cur.revenue ? 100 : 0, prev.revenue],
+      ["Giá vốn nguyên liệu & đồ uống (COGS)", -cur.cogs, -pct(cur.cogs, cur.revenue), -prev.cogs],
+      ["Lãi gộp bán hàng", cur.gross, cur.margin, prev.gross],
+      ["Chi phí hao hụt đã duyệt", -cur.wastage, -pct(cur.wastage, cur.revenue), -prev.wastage],
+      ["Chi phí nhân công trong kỳ", -cur.labor, -pct(cur.labor, cur.revenue), -prev.labor],
+      ["Chi phí phụ phẩm ước tính (đá, gas, than)", -cur.utility, -pct(cur.utility, cur.revenue), -prev.utility],
+      ["Lợi nhuận ròng ước tính", cur.net, pct(cur.net, cur.revenue), prev.net],
+      ["Trong đó: Thu tiền mặt", cur.cash, pct(cur.cash, cur.revenue), prev.cash],
+      ["Trong đó: Thu chuyển khoản VietQR", cur.qr, pct(cur.qr, cur.revenue), prev.qr],
+      ["Tiền Tip khách thưởng nhân viên", cur.tips, pct(cur.tips, cur.revenue), prev.tips],
+      ["Số lượng hóa đơn đã thanh toán", cur.bills, "", prev.bills],
+      ["Lượt khách phục vụ", cur.guests, "", prev.guests],
+    ];
+    lines.forEach((x) => {
+      rows.push([x[0], x[1], x[2] === "" ? "" : Number((x[2] || 0).toFixed(1)), x[3], (Number(x[1]) || 0) - (Number(x[3]) || 0)]);
+    });
+    const span = r.from === r.to ? r.from : r.from + "_den_" + r.to;
+    U.downloadCsv("bao_cao_lai_lo_PL_" + span + ".csv", rows);
+    App.toast("Đã xuất báo cáo kết quả kinh doanh P&L (" + r.label + ")", "success");
+  }
+  function exportSalesAuditCsv() {
+    const r = range();
+    const logs = (D().audit || D().auditLog || []).filter((l) => l && U.dayKey(l.at) >= r.from && U.dayKey(l.at) <= r.to);
+    const list = logs.length ? logs : (D().audit || D().auditLog || []).slice(0, 100);
+    const rows = csvMetaHeader("NHẬT KÝ KIỂM SOÁT THẤT THOÁT & THAO TÁC NHẠY CẢM", r);
+    rows.push(["STT", "Thời gian", "Ngày vận hành", "Thao tác", "Nhân viên thực hiện", "Chi tiết"]);
+    list.forEach((l, idx) => {
+      rows.push([idx + 1, U.dateTime(l.at), U.dayLabel(U.dayKey(l.at)), l.action || l.title || l.text || "", Engine.staffName(l.by || l.who), l.detail || l.reason || l.text || ""]);
+    });
+    const span = r.from === r.to ? r.from : r.from + "_den_" + r.to;
+    U.downloadCsv("nhat_ky_kiem_soat_" + span + ".csv", rows);
+    App.toast("Đã xuất nhật ký kiểm soát CSV", "success");
+  }
+
   function pageSales() {
     const st = S();
     const r = range();
     const pr = prevRange(r);
-    const curDays = Engine.days(r.from, r.to);
+    const bk = Engine.salesBreakdown(r.from, r.to);
+    const curDays = bk.days;
     const prevDays = Engine.days(pr.from, pr.to);
-    const cur = Engine.summarize(curDays);
+    const cur = bk.summary;
     const prev = Engine.summarize(prevDays);
-    const salesInRange = D().sales.filter((s) => s.dayKey >= r.from && s.dayKey <= r.to);
+    const salesInRange = bk.sales;
     const discounts = cur.discount !== undefined ? cur.discount : U.sum(salesInRange, (s) => s.discount || 0);
     const unlockCount = D().approvals.filter((a) => a.type === "unlock_bill" && U.dayKey(a.at) >= r.from && U.dayKey(a.at) <= r.to).length;
     const voidApps = D().approvals.filter((a) => a.type === "void_item" && U.dayKey(a.at) >= r.from && U.dayKey(a.at) <= r.to);
@@ -417,20 +736,48 @@
       UI.kpi({ label: "Số lượng hóa đơn", icon: "receipt", value: U.num(cur.bills) + " bill", meta: "Trung bình " + U.money(avgBill) + "/bill · " + U.num(cur.guests) + " lượt khách" }) +
       "</div>";
 
+    let emptyTodayHint = "";
+    if (r.preset === "today" && cur.bills === 0) {
+      const todayKey = U.dayKey();
+      const liveToday = Engine.liveDay(todayKey);
+      const [f7, t7] = Engine.rangeKeys("7d");
+      const s7 = Engine.summarize(Engine.days(f7, t7));
+      const yKey = shiftKey(todayKey, -1);
+      const yDay = Engine.days(yKey, yKey)[0];
+      if (s7.bills > 0 || liveToday.openTickets > 0) {
+        emptyTodayHint = UI.banner(
+          "info",
+          "info",
+          '<div class="row between wrap gap-8">' +
+            "<div><b>Hôm nay (" + U.dayLabel(todayKey) + ") chưa có hóa đơn thanh toán hoàn tất.</b> " +
+            (liveToday.openTickets ? "Hiện có <b>" + liveToday.openTickets + " bàn đang phục vụ (" + U.money(liveToday.openValue) + ")</b> chưa chốt bill. " : "") +
+            (s7.bills ? "Trong 7 ngày qua có <b>" + U.num(s7.bills) + " hóa đơn (" + U.money(s7.revenue) + ")</b>" + (yDay && yDay.bills ? " — hôm qua đạt <b>" + U.money(yDay.revenue) + "</b> (" + yDay.bills + " bill)." : ".") : "") +
+            "</div>" +
+            '<div class="row gap-8 wrap">' +
+            (yDay && yDay.bills ? UI.btn("Xem Hôm qua", { size: "sm", act: "owner.range", data: { value: "yesterday" } }) : "") +
+            (s7.bills ? UI.btn("Xem 7 ngày qua", { size: "sm", kind: "primary", act: "owner.range", data: { value: "7d" } }) : "") +
+            UI.btn("Xem Tháng này", { size: "sm", act: "owner.range", data: { value: "month" } }) +
+            "</div></div>"
+        );
+      }
+    }
+
+    const activeTab = ["pl", "invoices", "items", "fraud"].includes(st.salesTab) ? st.salesTab : "pl";
     const tabBar = tabs([
-      { value: "pl", label: "Báo cáo lãi lỗ (P&L)", icon: "file-spreadsheet" },
-      { value: "items", label: "Món bán chạy & biên lãi", icon: "utensils" },
-      { value: "fraud", label: "Chống thất thoát & ngoại lệ", icon: "shield-alert", count: voidsAfterPrint + unlockCount + postPrebillCount },
-    ], st.salesTab || "pl", "owner.salesTab");
+      { value: "pl", label: "Thống kê doanh thu & Lãi lỗ", icon: "file-spreadsheet" },
+      { value: "invoices", label: "Bảng kê hóa đơn", icon: "receipt-text", count: salesInRange.length },
+      { value: "items", label: "Món bán chạy & Biên lãi", icon: "utensils" },
+      { value: "fraud", label: "Chống thất thoát & Ngoại lệ", icon: "shield-alert", count: voidsAfterPrint + unlockCount + postPrebillCount },
+    ], activeTab, "owner.salesTab");
 
     let body = "";
-    if ((st.salesTab || "pl") === "pl") {
+    if (activeTab === "pl") {
       const plRows = [
         ["Doanh thu đồ ăn & bếp", U.money(cur.food), U.pct(pct(cur.food, cur.revenue)), ""],
         ["Doanh thu bia, rượu & đồ uống", U.money(cur.alcohol), U.pct(pct(cur.alcohol, cur.revenue)), ""],
         ["Phụ thu phòng VIP", U.money(cur.vipFee), U.pct(pct(cur.vipFee, cur.revenue)), ""],
         ["Giảm giá trực tiếp trên bill", "-" + U.money(discounts), U.pct(pct(discounts, cur.revenue)), "text-danger"],
-        ["Tổng doanh thu thuần", U.money(cur.revenue), "100%", "strong"],
+        ["Tổng doanh thu thuần", U.money(cur.revenue), cur.revenue ? "100%" : "0%", "strong"],
         ["Giá vốn nguyên liệu & đồ uống (COGS)", "-" + U.money(cur.cogs), U.pct(pct(cur.cogs, cur.revenue)), ""],
         ["Lãi gộp bán hàng", U.money(cur.gross), U.pct(margin), "strong"],
         ["Chi phí hao hụt đã duyệt", "-" + U.money(cur.wastage), U.pct(pct(cur.wastage, cur.revenue)), "text-danger"],
@@ -439,56 +786,221 @@
         ["Lợi nhuận ròng ước tính", U.money(cur.net), U.pct(pct(cur.net, cur.revenue)), "strong"],
       ].map((x) => '<tr class="' + x[3] + '"><td>' + x[0] + '</td><td class="num">' + x[1] + '</td><td class="num">' + x[2] + "</td></tr>").join("");
 
-      const chart = r.preset === "today" ? hourChart(r.to, 210) : dailyChart(curDays, 210);
+      const isSingleDay = r.from === r.to;
+      const chart = isSingleDay ? hourChart(r.to, 210) : dailyChart(curDays, 210);
       const paySplit = statRows([
         { l: "Tiền mặt", v: U.money(cur.cash) + " (" + U.pct(pct(cur.cash, cur.revenue || 1), 0) + ")" },
         { l: "Chuyển khoản VietQR", v: U.money(cur.qr) + " (" + U.pct(pct(cur.qr, cur.revenue || 1), 0) + ")" },
         { l: "Tiền tip nhân viên qua QR", v: U.money(cur.tips || 0) },
         { l: "Chi phí phụ phẩm / Doanh thu bếp", v: U.pct(cur.utilityPct), cls: "sr-total" },
       ]);
-      body = '<div class="grid-2">' +
-        card("Báo cáo kết quả kinh doanh (" + r.label + ")", tbl('<th>Chỉ tiêu</th><th class="num">Số tiền</th><th class="num">Tỷ trọng</th>', plRows), { icon: "file-spreadsheet", flush: true }) +
-        '<div class="col gap-16">' +
-        card(r.preset === "today" ? "Doanh thu theo giờ hôm nay" : "Diễn biến doanh thu theo ngày", chart, { icon: "chart-line" }) +
-        card("Cơ cấu phương thức thanh toán", paySplit, { icon: "wallet" }) +
-        "</div></div>";
-    } else if (st.salesTab === "items") {
+
       const th = Number(C().marginAlert) || 35;
-      const topMap = {};
-      Engine.topItems(r.from, r.to, 100).forEach((t) => { topMap[t.menuId] = t; });
-      const items = C().menu.map((m) => {
-        const prc = Number(m.kind === "seafood" ? m.pricePerKg : m.price) || 0;
-        const cst = Number(m.kind === "seafood" ? m.costPerKg : m.cost) || 0;
-        const mg = prc ? ((prc - cst) / prc) * 100 : 0;
-        const stat = topMap[m.id] || { qty: 0, kg: 0, amount: 0, cost: 0 };
-        const qVal = m.kind === "seafood" ? stat.kg : stat.qty;
-        return { m, prc, cst, mg, qty: qVal, rev: stat.amount, profit: stat.amount - stat.cost };
-      }).sort((a, b) => b.rev - a.rev || a.mg - b.mg);
+      const dailyRows = curDays.slice().reverse().map((d) => {
+        const dGross = (Number(d.revenue) || 0) - (Number(d.cogs) || 0);
+        const dMg = d.revenue ? (dGross / d.revenue) * 100 : 0;
+        const vipDisc = (Number(d.vipFee) || 0) - (Number(d.discount) || 0);
+        const stBadge = d.dayKey === U.dayKey()
+          ? UI.badge("Hôm nay", "info")
+          : d.live && d.bills > 0
+          ? UI.badge("Chưa chốt ca", "warning")
+          : "";
+        return "<tr" + (d.bills === 0 ? ' class="row-dim"' : "") + ">" +
+          '<td class="nowrap"><b>' + U.dayLabel(d.dayKey) + '</b><div class="small muted">' + esc(U.weekday(U.dayStart(d.dayKey))) + (stBadge ? " · " + stBadge : "") + "</div></td>" +
+          '<td class="num">' + (d.bills ? U.num(d.bills) : "-") + "</td>" +
+          '<td class="num">' + (d.guests ? U.num(d.guests) : "-") + "</td>" +
+          '<td class="num">' + (d.food ? U.money(d.food) : "-") + "</td>" +
+          '<td class="num">' + (d.alcohol ? U.money(d.alcohol) : "-") + "</td>" +
+          '<td class="num ' + (vipDisc < 0 ? "text-danger" : "") + '">' + (vipDisc ? signed(vipDisc, U.money) : "-") + "</td>" +
+          '<td class="num strong">' + (d.revenue ? U.money(d.revenue) : "0 đ") + "</td>" +
+          '<td class="num">' + (d.cash ? U.money(d.cash) : "-") + "</td>" +
+          '<td class="num">' + (d.qr ? U.money(d.qr) : "-") + "</td>" +
+          '<td class="num text-success">' + (d.tips ? "+" + U.money(d.tips) : "-") + "</td>" +
+          '<td class="num">' + (d.cogs ? U.money(d.cogs) : "-") + "</td>" +
+          '<td class="num strong">' + (d.revenue ? U.money(dGross) : "-") + "</td>" +
+          '<td class="num">' + (d.revenue ? UI.badge(U.pct(dMg), dMg < th ? "danger" : dMg < th + 10 ? "warning" : "success") : "-") + "</td></tr>";
+      }).join("");
+
+      const totVipDisc = (Number(cur.vipFee) || 0) - (Number(cur.discount) || 0);
+      const dailyFoot =
+        "<td><b>TỔNG CỘNG (" + curDays.length + " ngày)</b></td>" +
+        '<td class="num"><b>' + U.num(cur.bills) + "</b></td>" +
+        '<td class="num"><b>' + U.num(cur.guests) + "</b></td>" +
+        '<td class="num"><b>' + U.money(cur.food) + "</b></td>" +
+        '<td class="num"><b>' + U.money(cur.alcohol) + "</b></td>" +
+        '<td class="num"><b>' + (totVipDisc ? signed(totVipDisc, U.money) : "0 đ") + "</b></td>" +
+        '<td class="num"><b>' + U.money(cur.revenue) + "</b></td>" +
+        '<td class="num"><b>' + U.money(cur.cash) + "</b></td>" +
+        '<td class="num"><b>' + U.money(cur.qr) + "</b></td>" +
+        '<td class="num text-success"><b>' + (cur.tips ? "+" + U.money(cur.tips) : "0 đ") + "</b></td>" +
+        '<td class="num"><b>' + U.money(cur.cogs) + "</b></td>" +
+        '<td class="num"><b>' + U.money(cur.gross) + "</b></td>" +
+        '<td class="num"><b>' + U.pct(margin) + "</b></td>";
+
+      body = '<div class="grid-2">' +
+        card("Báo cáo kết quả kinh doanh (" + r.label + ")", tbl('<th>Chỉ tiêu</th><th class="num">Số tiền</th><th class="num">Tỷ trọng</th>', plRows), {
+          icon: "file-spreadsheet",
+          flush: true,
+          right: UI.btn("Xuất CSV P&L", { size: "sm", icon: "download", act: "owner.exportPlCsv" }),
+        }) +
+        '<div class="col gap-16">' +
+        card(isSingleDay ? "Doanh thu theo giờ (" + U.dayLabel(r.to) + ")" : "Diễn biến doanh thu theo ngày (" + r.label + ")", chart, { icon: "chart-line" }) +
+        card("Cơ cấu phương thức thanh toán", paySplit, { icon: "wallet" }) +
+        "</div></div>" +
+        '<div class="mt-16">' +
+        card(
+          "Bảng thống kê doanh thu bán hàng theo ngày (" + curDays.length + " ngày)",
+          tbl(
+            '<th>Ngày</th><th class="num">Bill</th><th class="num">Khách</th><th class="num">Đồ ăn & Bếp</th><th class="num">Bia rượu</th><th class="num">VIP / Giảm</th><th class="num">Doanh thu thuần</th><th class="num">Tiền mặt</th><th class="num">VietQR</th><th class="num">Tiền Tip</th><th class="num">Giá vốn</th><th class="num">Lãi gộp</th><th class="num">Biên lãi</th>',
+            dailyRows,
+            dailyFoot
+          ),
+          {
+            icon: "calendar",
+            flush: true,
+            sub: "Tổng hợp đầy đủ cả các ca đã chốt sổ và hóa đơn thực thu từ các ca đang mở",
+            right: UI.btn("Xuất CSV theo ngày", { size: "sm", kind: "primary", icon: "download", act: "owner.exportDailyCsv" }),
+          }
+        ) +
+        "</div>";
+    } else if (activeTab === "invoices") {
+      const cashCnt = salesInRange.filter((s) => s.cashAmt > 0).length;
+      const qrCnt = salesInRange.filter((s) => s.qrAmt > 0).length;
+      const tipCnt = salesInRange.filter((s) => (s.tip || 0) > 0).length;
+      const payChips = [
+        { value: "all", label: "Tất cả", count: salesInRange.length },
+        { value: "cash", label: "Tiền mặt", count: cashCnt },
+        { value: "qr", label: "Chuyển khoản QR", count: qrCnt },
+        { value: "tip", label: "Có tiền Tip", count: tipCnt },
+      ];
+      const filtered = filterSalesList(salesInRange, st);
+      const toolbar =
+        '<div class="sales-toolbar">' +
+          UI.chips(payChips, st.salesPay || "all", "owner.salesPay") +
+          '<div class="sales-search">' +
+            UI.search({ id: "owner-sales-q", model: "owner.salesQ", value: st.salesQ || "", placeholder: "Tìm mã HĐ, mã QR, bàn, món ăn, nhân viên..." }) +
+          "</div>" +
+        "</div>";
+
+      const invRows = filtered.map((s) => {
+        const tb = Engine.table(s.tableId);
+        const vipDisc = (Number(s.vipFee) || 0) - (Number(s.discount) || 0);
+        const pmBadge = s.paymentSource === "webhook_qr"
+          ? UI.badge("Webhook QR", "success")
+          : s.cashAmt > 0 && s.qrAmt > 0
+          ? UI.badge("TM + QR", "info")
+          : s.qrAmt > 0
+          ? UI.badge("VietQR", "primary")
+          : UI.badge("Tiền mặt", "neutral");
+        const itemsPreview = saleItemsText(s);
+        return "<tr>" +
+          '<td class="nowrap"><b>' + esc(s.payCode || s.id.slice(-8).toUpperCase()) + '</b><div class="small muted">' + esc(s.id) + "</div></td>" +
+          '<td class="nowrap">' + U.dayLabel(s.dayKey || U.dayKey(s.closedAt)) + '<div class="small muted">' + U.time(s.openedAt) + " – " + U.time(s.closedAt) + "</div></td>" +
+          '<td class="nowrap"><b>' + esc(tb ? tb.code : s.tableCode || s.tableId) + '</b><div class="small muted">' + esc(s.areaName || "") + " · " + (s.guests || 1) + " khách</div></td>" +
+          '<td class="nowrap">' + esc(Engine.staffName(s.waiterId)) + '<div class="small muted">TN: ' + esc(Engine.staffName(s.cashierId)) + "</div></td>" +
+          '<td class="small sale-items-cell" title="' + esc(itemsPreview) + '">' + esc(itemsPreview || "-") + "</td>" +
+          '<td class="num">' + U.money(s.subtotal || s.grand || 0) + "</td>" +
+          '<td class="num ' + (vipDisc < 0 ? "text-danger" : "") + '">' + (vipDisc ? signed(vipDisc, U.money) : "-") + "</td>" +
+          '<td class="num strong">' + U.money(s.grand || 0) + "</td>" +
+          "<td>" + pmBadge + "</td>" +
+          '<td class="num text-success">' + (s.tip > 0 ? "+" + U.money(s.tip) : "-") + "</td>" +
+          '<td class="right nowrap">' + UI.btn("Phiếu K80", { size: "sm", icon: "receipt", act: "owner.viewSaleReceipt", data: { id: s.id } }) + "</td></tr>";
+      }).join("");
+
+      const sumSub = U.sum(filtered, (s) => s.subtotal || s.grand || 0);
+      const sumVipDisc = U.sum(filtered, (s) => (Number(s.vipFee) || 0) - (Number(s.discount) || 0));
+      const sumGrand = U.sum(filtered, (s) => s.grand || 0);
+      const sumTip = U.sum(filtered, (s) => s.tip || 0);
+      const sumGuests = U.sum(filtered, (s) => s.guests || 0);
+      const invFoot =
+        '<td colspan="2"><b>TỔNG CỘNG (' + filtered.length + ' hóa đơn)</b></td>' +
+        '<td><b>' + U.num(sumGuests) + " khách</b></td>" +
+        '<td colspan="2"></td>' +
+        '<td class="num"><b>' + U.money(sumSub) + "</b></td>" +
+        '<td class="num"><b>' + (sumVipDisc ? signed(sumVipDisc, U.money) : "0 đ") + "</b></td>" +
+        '<td class="num"><b>' + U.money(sumGrand) + "</b></td>" +
+        "<td></td>" +
+        '<td class="num text-success"><b>' + (sumTip ? "+" + U.money(sumTip) : "0 đ") + "</b></td>" +
+        "<td></td>";
+
+      body = card(
+        "Sổ chi tiết hóa đơn đã thanh toán (" + filtered.length + "/" + salesInRange.length + " bill)",
+        '<div class="card-body border-b">' + toolbar + "</div>" +
+          (filtered.length
+            ? tbl(
+                '<th>Mã QR / Mã HĐ</th><th>Thời gian</th><th>Bàn / Khu</th><th>Phục vụ / Thu ngân</th><th>Món đã gọi</th><th class="num">Tiền món</th><th class="num">VIP / Giảm</th><th class="num">Doanh thu thuần</th><th>Thanh toán</th><th class="num">Tiền Tip</th><th></th>',
+                invRows,
+                invFoot
+              )
+            : UI.empty("receipt-text", "Không có hóa đơn phù hợp trong kỳ đã chọn", "Hãy thử đổi bộ lọc thời gian (7 ngày, Tháng này) hoặc xóa từ khóa tìm kiếm.")),
+        {
+          icon: "receipt-text",
+          flush: true,
+          sub: "Tra cứu từng bill, đối chiếu phương thức thanh toán, xem lại bản sao K80 và xuất bảng kê chi tiết ra CSV/Excel",
+          right: UI.btn("Xuất CSV hóa đơn (" + filtered.length + ")", { size: "sm", kind: "primary", icon: "download", act: "owner.exportInvoicesCsv", data: { filtered: "1" }, disabled: !filtered.length }),
+        }
+      );
+    } else if (activeTab === "items") {
+      const th = Number(C().marginAlert) || 35;
+      const items = buildItemStats(r.from, r.to);
       const rows = items.map((x) => "<tr>" +
-        '<td><div class="strong">' + esc(x.m.name) + '</div><div class="small muted">' + esc((C().categories.find((c) => c.id === x.m.categoryId) || {}).name || "") + "</div></td>" +
-        '<td class="num">' + U.money(x.prc) + (x.m.kind === "seafood" ? "/kg" : "") + "</td>" +
-        '<td class="num">' + U.money(x.cst) + "</td>" +
+        '<td><div class="strong">' + esc(x.name) + '</div><div class="small muted">' + esc(x.cat) + "</div></td>" +
+        '<td class="num">' + (x.prc ? U.money(x.prc) + (x.isSeafood ? "/kg" : "") : "-") + "</td>" +
+        '<td class="num">' + (x.cst ? U.money(x.cst) : "-") + "</td>" +
         '<td class="num">' + UI.badge(U.pct(x.mg), x.mg < th ? "danger" : x.mg < th + 10 ? "warning" : "success") + "</td>" +
-        '<td class="num">' + (x.qty ? U.num(x.qty, x.m.kind === "seafood" ? 2 : 0) + " " + esc(x.m.unit || "") : "-") + "</td>" +
+        '<td class="num">' +
+          (x.qty ? U.num(x.qty, x.isSeafood ? 2 : 0) + " " + esc(x.unit) : "-") +
+          (x.freeQty ? '<div class="small text-success">+' + U.num(x.freeQty) + " tặng KM</div>" : "") +
+        "</td>" +
         '<td class="num strong">' + (x.rev ? U.money(x.rev) : "-") + "</td>" +
-        '<td class="num">' + (x.rev ? U.money(x.profit) : "-") + "</td></tr>").join("");
-      body = card("Hiệu quả món ăn & kiểm soát biên lãi gộp", tbl('<th>Món</th><th class="num">Giá bán</th><th class="num">Giá vốn</th><th class="num">Biên lãi</th><th class="num">Sản lượng</th><th class="num">Doanh thu</th><th class="num">Lãi gộp</th>', rows), {
-        icon: "utensils", flush: true, sub: "Ngưỡng cảnh báo biên lãi hiện tại: " + th + "% (điều chỉnh trong Cài đặt)",
+        '<td class="num">' + (x.totalCost ? U.money(x.totalCost) : "-") + "</td>" +
+        '<td class="num strong">' + (x.rev || x.totalCost ? U.money(x.profit) : "-") + "</td></tr>").join("");
+      const totItemRev = U.sum(items, (x) => x.rev);
+      const totItemCost = U.sum(items, (x) => x.totalCost);
+      const totItemProfit = totItemRev - totItemCost;
+      const totFree = U.sum(items, (x) => x.freeQty || 0);
+      const itemFoot =
+        "<td><b>TỔNG CỘNG (" + items.filter((x) => x.qty > 0 || x.freeQty > 0).length + "/" + items.length + " món phát sinh)</b></td>" +
+        '<td colspan="3"></td>' +
+        '<td class="num"><b>' + (totFree ? "+" + U.num(totFree) + " KM" : "-") + "</b></td>" +
+        '<td class="num"><b>' + U.money(totItemRev) + "</b></td>" +
+        '<td class="num"><b>' + U.money(totItemCost) + "</b></td>" +
+        '<td class="num"><b>' + U.money(totItemProfit) + "</b></td>";
+      body = card("Thống kê sản lượng, doanh thu & biên lãi theo món (" + r.label + ")", tbl('<th>Món</th><th class="num">Giá bán</th><th class="num">Giá vốn ĐV</th><th class="num">Biên chuẩn</th><th class="num">Sản lượng</th><th class="num">Doanh thu</th><th class="num">Tổng giá vốn</th><th class="num">Lãi gộp</th>', rows, itemFoot), {
+        icon: "utensils",
+        flush: true,
+        sub: "Ngưỡng cảnh báo biên lãi hiện tại: " + th + "% (điều chỉnh trong Cài đặt)",
+        right: UI.btn("Xuất CSV theo món", { size: "sm", kind: "primary", icon: "download", act: "owner.exportItemsCsv" }),
       });
     } else {
-      const logs = (D().audit || D().auditLog || []).slice(0, 40);
+      const allLogs = D().audit || D().auditLog || [];
+      const rangeLogs = allLogs.filter((l) => l && U.dayKey(l.at) >= r.from && U.dayKey(l.at) <= r.to);
+      const logs = (rangeLogs.length ? rangeLogs : allLogs).slice(0, 50);
       const logRows = logs.map((l) => '<tr><td class="nowrap">' + U.dateTime(l.at) + "</td><td><b>" + esc(l.action || l.title || l.text || "") + "</b></td><td>" + esc(Engine.staffName(l.by || l.who)) + "</td><td>" + esc(l.detail || l.reason || l.text || "") + "</td></tr>").join("");
       body = '<div class="grid-3 mb-16">' +
         UI.kpi({ label: "Mở khóa / Sửa sau tạm tính", icon: "lock-open", value: U.num(unlockCount + postPrebillCount) + " lần", meta: unlockCount + " lần mở khóa · " + postPrebillCount + " lần trả bia sau tạm tính", tone: unlockCount + postPrebillCount > 2 ? "warn" : "" }) +
         UI.kpi({ label: "Hủy món sau khi đã gửi bếp", icon: "ban", value: U.num(voidsAfterPrint) + " món", meta: "Giá trị hủy: " + U.money(voidAmount), tone: voidsAfterPrint ? "warn" : "" }) +
         UI.kpi({ label: "Tổng giảm giá trực tiếp", icon: "badge-percent", value: U.money(discounts), meta: "Chiếm " + U.pct(pct(discounts, cur.revenue || 1)) + " doanh thu" }) +
         "</div>" +
-        card("Nhật ký kiểm toán các thao tác nhạy cảm", logRows ? tbl("<th>Thời gian</th><th>Thao tác</th><th>Nhân viên</th><th>Chi tiết</th>", logRows) : UI.empty("shield-check", "Không có thao tác nhạy cảm nào"), { icon: "shield-alert", flush: true });
+        card(
+          "Nhật ký kiểm toán các thao tác nhạy cảm",
+          logRows ? tbl("<th>Thời gian</th><th>Thao tác</th><th>Nhân viên</th><th>Chi tiết</th>", logRows) : UI.empty("shield-check", "Không có thao tác nhạy cảm nào"),
+          {
+            icon: "shield-alert",
+            flush: true,
+            right: logs.length ? UI.btn("Xuất CSV nhật ký", { size: "sm", icon: "download", act: "owner.exportAuditCsv" }) : "",
+          }
+        );
     }
 
     return '<div class="page">' +
-      head("Bán hàng và lãi lỗ", "Theo dõi doanh thu, giá vốn, biên lãi gộp và các ngoại lệ vận hành.", rangeSeg()) +
-      summary("Kỳ <b>" + r.label + "</b>: doanh thu <b>" + U.money(cur.revenue) + "</b>, lãi gộp <b>" + U.money(cur.gross) + "</b> (biên lãi " + U.pct(margin) + ") từ " + U.num(cur.bills) + " hóa đơn.") +
+      head(
+        "Bán hàng và lãi lỗ",
+        "Thống kê chi tiết doanh thu theo ngày, sổ hóa đơn bán hàng, biên lãi từng món và xuất bảng kê CSV/Excel.",
+        rangeSeg() + UI.btn("Xuất bảng kê CSV", { kind: "primary", size: "sm", icon: "download", act: "owner.exportSalesModal" })
+      ) +
+      emptyTodayHint +
+      summary("Kỳ <b>" + r.label + "</b>: doanh thu thuần <b>" + U.money(cur.revenue) + "</b> (Tiền mặt <b>" + U.money(cur.cash) + "</b> · VietQR <b>" + U.money(cur.qr) + "</b>), lãi gộp <b>" + U.money(cur.gross) + "</b> (biên lãi " + U.pct(margin) + ") từ <b>" + U.num(cur.bills) + " hóa đơn</b> (" + U.num(cur.guests) + " khách).") +
       kpis + tabBar + body + "</div>";
   }
 
@@ -670,13 +1182,35 @@
     const totalVat = tot.vatFood + tot.vatAlcohol;
 
     const kpis = '<div class="grid-4 owner-kpis">' +
-      UI.kpi({ label: "Tổng doanh thu chịu thuế", icon: "banknote", value: U.money(tot.revenue), meta: U.monthLabel(mk) + " · " + (isCo ? "Công ty TNHH" : "Hộ kinh doanh") }) +
+      UI.kpi({ label: "Tổng doanh thu chịu thuế", icon: "banknote", value: U.money(tot.revenue), meta: U.monthLabel(mk) + " · " + U.num(tot.bills || 0) + " hóa đơn · " + (isCo ? "Công ty TNHH" : "Hộ kinh doanh") }) +
       UI.kpi({ label: "Thuế GTGT đồ ăn (" + C().tax.food + "%)", icon: "utensils", value: U.money(tot.vatFood), meta: "Doanh thu nhóm đồ ăn: " + U.money(tot.food) }) +
       UI.kpi({ label: "Thuế GTGT rượu bia (" + C().tax.alcohol + "%)", icon: "beer", value: U.money(tot.vatAlcohol), meta: "Doanh thu nhóm rượu bia: " + U.money(tot.alcohol) }) +
       UI.kpi({ label: isCo ? "Tổng thuế GTGT đầu ra" : "Thuế khoán HKD (" + C().tax.hkdRate + "%)", icon: "landmark", value: U.money(isCo ? totalVat : tot.hkdTax), meta: locked ? "Kỳ thuế đã khóa sổ" : "Kỳ thuế đang mở", tone: locked ? "good" : "" }) +
       "</div>";
 
-    const invRows = D().einvoices.slice(0, 50).map((e) => {
+    const dayTaxRows = tx.rows.slice().reverse().map((d) => {
+      const dVat = (d.vatFood || 0) + (d.vatAlcohol || 0);
+      return "<tr" + (!d.bills && !d.revenue ? ' class="row-dim"' : "") + ">" +
+        '<td class="nowrap"><b>' + U.dayLabel(d.dayKey) + '</b><div class="small muted">' + esc(U.weekday(U.dayStart(d.dayKey))) + (d.live && d.bills > 0 && d.dayKey !== U.dayKey() ? " · " + UI.badge("Chưa chốt ca", "warning") : "") + "</div></td>" +
+        '<td class="num">' + (d.bills ? U.num(d.bills) : "-") + "</td>" +
+        '<td class="num">' + (d.food ? U.money(d.food) : "-") + "</td>" +
+        '<td class="num">' + (d.vatFood ? U.money(d.vatFood) : "-") + "</td>" +
+        '<td class="num">' + (d.alcohol ? U.money(d.alcohol) : "-") + "</td>" +
+        '<td class="num">' + (d.vatAlcohol ? U.money(d.vatAlcohol) : "-") + "</td>" +
+        '<td class="num strong">' + (d.revenue ? U.money(d.revenue) : "0 đ") + "</td>" +
+        '<td class="num strong">' + (dVat ? U.money(dVat) : "-") + "</td></tr>";
+    }).join("");
+    const dayTaxFoot =
+      "<td><b>TỔNG CỘNG (" + U.monthLabel(mk) + ")</b></td>" +
+      '<td class="num"><b>' + U.num(tot.bills || 0) + "</b></td>" +
+      '<td class="num"><b>' + U.money(tot.food) + "</b></td>" +
+      '<td class="num"><b>' + U.money(tot.vatFood) + "</b></td>" +
+      '<td class="num"><b>' + U.money(tot.alcohol) + "</b></td>" +
+      '<td class="num"><b>' + U.money(tot.vatAlcohol) + "</b></td>" +
+      '<td class="num"><b>' + U.money(tot.revenue) + "</b></td>" +
+      '<td class="num"><b>' + U.money(totalVat) + "</b></td>";
+
+    const invRows = tx.einvoices.slice(0, 50).map((e) => {
       const isPending = e.status === "requested";
       return "<tr>" +
         '<td class="nowrap"><b>' + esc(e.invoiceNo || e.no || e.id) + "</b></td>" +
@@ -691,11 +1225,25 @@
     return '<div class="page">' +
       head("Thuế và hóa đơn điện tử", "Tách tự động thuế suất đồ ăn (" + C().tax.food + "%) và rượu bia (" + C().tax.alcohol + "%), xuất bảng kê chuẩn kế toán.",
         monthSelect() +
-        UI.btn("Xuất bảng kê CSV", { size: "sm", icon: "download", act: "owner.exportTax" }) +
-        UI.btn(locked ? "Đã khóa kỳ thuế" : "Khóa sổ kỳ thuế", { size: "sm", kind: locked ? "" : "primary", icon: "lock", act: "owner.lockTax", disabled: locked })
+        UI.btn("Xuất bảng kê CSV", { size: "sm", kind: "primary", icon: "download", act: "owner.exportTax" }) +
+        UI.btn(locked ? "Đã khóa kỳ thuế" : "Khóa sổ kỳ thuế", { size: "sm", kind: locked ? "" : "default", icon: "lock", act: "owner.lockTax", disabled: locked })
       ) +
       kpis +
-      card("Yêu cầu & Hóa đơn điện tử GTGT (" + D().einvoices.length + ")", invRows ? tbl('<th>Số tham chiếu / HĐ</th><th>Thời điểm</th><th>Đơn vị mua / Mã số thuế / Địa chỉ / Email</th><th class="num">Tổng thanh toán</th><th>Trạng thái</th>', invRows) : UI.empty("receipt-text", "Chưa có yêu cầu hoặc hóa đơn điện tử nào"), { icon: "receipt-text", flush: true }) +
+      card(
+        "Bảng kê doanh thu & Thuế GTGT đầu ra theo ngày · " + U.monthLabel(mk),
+        tbl(
+          '<th>Ngày</th><th class="num">Số bill</th><th class="num">Doanh thu đồ ăn</th><th class="num">GTGT đồ ăn (' + C().tax.food + '%)</th><th class="num">Doanh thu rượu bia</th><th class="num">GTGT rượu bia (' + C().tax.alcohol + '%)</th><th class="num">Tổng doanh thu</th><th class="num">Tổng thuế GTGT</th>',
+          dayTaxRows,
+          dayTaxFoot
+        ),
+        {
+          icon: "file-spreadsheet",
+          flush: true,
+          sub: C().tax.pricesIncludeVat ? "Giá bán trên menu đã bao gồm thuế GTGT" : "Thuế GTGT cộng thêm trên giá chưa thuế",
+          right: UI.btn("Xuất bảng kê thuế CSV", { size: "sm", icon: "download", act: "owner.exportTax" }),
+        }
+      ) +
+      card("Yêu cầu & Hóa đơn điện tử GTGT (" + tx.einvoices.length + ")", invRows ? tbl('<th>Số tham chiếu / HĐ</th><th>Thời điểm</th><th>Đơn vị mua / Mã số thuế / Địa chỉ / Email</th><th class="num">Tổng thanh toán</th><th>Trạng thái</th>', invRows) : UI.empty("receipt-text", "Chưa có yêu cầu hoặc hóa đơn điện tử nào trong " + U.monthLabel(mk)), { icon: "receipt-text", flush: true }) +
       "</div>";
   }
 
@@ -783,8 +1331,8 @@
           right: (Engine.currentShift() && Engine.currentShift().status === "auto_locked"
             ? UI.btn("Mở khóa ca thu ngân", { size: "sm", kind: "warning", icon: "lock-open", act: "owner.unlockShift" })
             : "") +
-            UI.btn("PostgreSQL 16", { size: "sm", icon: "database", act: "app.pgModal" }) +
-            UI.btn("Dữ liệu hệ thống", { size: "sm", icon: "hard-drive", act: "app.demoMenu" }) +
+            UI.btn("PostgreSQL 16", { size: "sm", icon: "database", act: "app.pgModal", cls: "owner-hide-sm" }) +
+            UI.btn("Dữ liệu hệ thống", { size: "sm", icon: "hard-drive", act: "app.demoMenu", cls: "owner-hide-sm" }) +
             UI.btn("Cài đặt", { size: "sm", kind: page === "settings" ? "primary" : "default", icon: "settings", act: "owner.nav", data: { page: "settings" } }),
         }) +
         '<div class="app-with-sidebar">' + sidebar + '<main class="main-col">' + content + "</main></div>" +
@@ -800,18 +1348,84 @@
     },
     "owner.more": () => {
       const cur = curPage();
+      const dirtySet = window.OwnerPages.settings && window.OwnerPages.settings.isDirty && window.OwnerPages.settings.isDirty();
       const extra = NAV.slice(4).concat([SETTINGS]);
       App.sheet({
         title: "Danh mục quản trị",
-        body: () => '<div class="col gap-8">' + extra.map((n) => '<button type="button" class="opt-card' + (cur === n.id ? " active" : "") + '" data-act="owner.navSheet" data-page="' + n.id + '"><span class="ch-icon">' + I(n.icon) + '</span><div><b>' + esc(n.label) + '</b><div class="small muted">' + esc(n.desc) + "</div></div></button>").join("") + "</div>",
+        sub: "Chọn phân hệ hoặc công cụ hệ thống",
+        body: () =>
+          '<div class="col">' +
+          extra
+            .map(
+              (n) =>
+                '<button type="button" class="opt-card' +
+                (cur === n.id ? " active" : "") +
+                '" data-act="owner.navSheet" data-page="' +
+                n.id +
+                '"><span class="ch-icon">' +
+                I(n.icon) +
+                '</span><div class="grow"><b>' +
+                esc(n.label) +
+                "</b>" +
+                (n.id === "settings" && dirtySet ? ' <span class="badge badge-warning">Chưa lưu</span>' : "") +
+                '<div class="small muted">' +
+                esc(n.desc) +
+                "</div></div></button>"
+            )
+            .join("") +
+          '<div class="nav-sep"></div>' +
+          '<div class="small muted strong" style="padding:0 4px">Công cụ hệ thống</div>' +
+          '<button type="button" class="opt-card" data-act="owner.sheetAct" data-run="app.demoMenu"><span class="ch-icon">' +
+          I("hard-drive") +
+          '</span><div class="grow"><b>Dữ liệu hệ thống</b><div class="small muted">Sao lưu JSON, khởi tạo quán mới, dữ liệu mẫu</div></div></button>' +
+          '<button type="button" class="opt-card" data-act="owner.sheetAct" data-run="app.pgModal"><span class="ch-icon">' +
+          I("database") +
+          '</span><div class="grow"><b>Cơ sở dữ liệu PostgreSQL 16</b><div class="small muted">Kiểm tra kết nối 37 bảng và truy vấn SQL</div></div></button>' +
+          '<button type="button" class="opt-card" data-act="owner.sheetAct" data-run="app.logout"><span class="ch-icon" style="color:var(--danger);background:var(--danger-50)">' +
+          I("log-out") +
+          '</span><div class="grow"><b class="text-danger">Đăng xuất</b><div class="small muted">Thoát tài khoản trên thiết bị này</div></div></button>' +
+          "</div>",
       });
     },
     "owner.navSheet": (d) => {
       App.closeModal();
       App.go("owner", d.page);
     },
+    "owner.sheetAct": (d) => {
+      App.closeModal();
+      if (d && d.run) App.run(d.run);
+    },
     "owner.range": (d) => {
-      S().range = d.value;
+      const st = S();
+      st.range = d.value;
+      st._rangeManual = true;
+      if (d.value === "custom") {
+        const today = U.dayKey();
+        if (!st.customFrom) st.customFrom = shiftKey(today, -6);
+        if (!st.customTo) st.customTo = today;
+      }
+      App.render();
+    },
+    "owner.quickSalesRange": (d) => {
+      const st = S();
+      if (d.range) {
+        st.range = d.range;
+        st._rangeManual = true;
+      }
+      App.go("owner", "sales");
+    },
+    "owner.customFrom": (d, el) => {
+      if (!el.value) return;
+      S().customFrom = el.value;
+      S().range = "custom";
+      S()._rangeManual = true;
+      App.render();
+    },
+    "owner.customTo": (d, el) => {
+      if (!el.value) return;
+      S().customTo = el.value;
+      S().range = "custom";
+      S()._rangeManual = true;
       App.render();
     },
     "owner.chart": (d) => {
@@ -919,6 +1533,72 @@
       S().salesTab = d.value;
       App.render();
     },
+    "owner.salesPay": (d) => {
+      S().salesPay = d.value || "all";
+      App.render();
+    },
+    "owner.viewSaleReceipt": (d) => {
+      const s = Engine.saleById(d.id);
+      if (!s) return App.toast("Không tìm thấy hóa đơn.", "error");
+      const doc = Engine.saleReceiptDoc(s);
+      const tb = Engine.table(s.tableId);
+      App.modal({
+        title: "Hóa đơn K80 · Bàn " + (tb ? tb.code : s.tableCode || s.tableId),
+        sub: U.dayLabel(s.dayKey || U.dayKey(s.closedAt)) + " · " + U.time(s.closedAt) + (s.payCode ? " · Mã QR: " + s.payCode : ""),
+        size: "sm",
+        body: () => UI.receipt(doc),
+        foot: () => UI.btn("In ra máy in K80", { icon: "printer", act: "app.printK80" }) + UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
+      });
+    },
+    "owner.exportSalesModal": () => {
+      App.modal({
+        title: "Xuất bảng kê doanh thu bán hàng (CSV / Excel)",
+        sub: () => {
+          const r = range();
+          const bk = Engine.salesBreakdown(r.from, r.to);
+          return "Kỳ đang chọn: " + r.label + " (" + U.dayLabel(r.from) + " – " + U.dayLabel(r.to) + ") · " + bk.sales.length + " hóa đơn · " + U.money(bk.summary.revenue);
+        },
+        size: "md",
+        body: () => {
+          const r = range();
+          const bk = Engine.salesBreakdown(r.from, r.to);
+          const items = buildItemStats(r.from, r.to);
+          const soldItemsCount = items.filter((x) => x.qty > 0 || x.freeQty > 0).length;
+          return '<div class="col gap-12">' +
+            '<div><div class="small strong mb-6">Chọn kỳ thời gian xuất bảng kê:</div>' + rangeSeg() + "</div>" +
+            '<div class="export-grid">' +
+              '<button type="button" class="opt-card export-opt" data-act="owner.exportDailyCsv">' +
+                '<span class="ch-icon">' + I("calendar") + "</span>" +
+                '<div class="grow"><b>1. Bảng kê doanh thu tổng hợp theo ngày (.csv)</b><div class="small muted">' + bk.days.length + " ngày · Đầy đủ số bill, khách, đồ ăn, bia rượu, tiền mặt, VietQR, Tip, giá vốn & lãi gộp mỗi ngày</div></div>" +
+                UI.badge("Tải CSV", "primary") +
+              "</button>" +
+              '<button type="button" class="opt-card export-opt" data-act="owner.exportInvoicesCsv">' +
+                '<span class="ch-icon">' + I("receipt-text") + "</span>" +
+                '<div class="grow"><b>2. Bảng kê chi tiết từng hóa đơn bán hàng (.csv)</b><div class="small muted">' + bk.sales.length + " hóa đơn · Mã HĐ, Mã QR, giờ vào/ra, bàn, nhân viên, chi tiết món, thuế GTGT, giá vốn & lãi gộp từng bill</div></div>" +
+                UI.badge("Tải CSV", "primary") +
+              "</button>" +
+              '<button type="button" class="opt-card export-opt" data-act="owner.exportItemsCsv">' +
+                '<span class="ch-icon">' + I("utensils") + "</span>" +
+                '<div class="grow"><b>3. Bảng kê sản lượng & lợi nhuận theo món (.csv)</b><div class="small muted">' + soldItemsCount + "/" + items.length + " mặt hàng phát sinh · Giá bán, giá vốn, sản lượng bán, tặng KM, doanh thu & lãi gộp</div></div>" +
+                UI.badge("Tải CSV", "primary") +
+              "</button>" +
+              '<button type="button" class="opt-card export-opt" data-act="owner.exportPlCsv">' +
+                '<span class="ch-icon">' + I("file-spreadsheet") + "</span>" +
+                '<div class="grow"><b>4. Báo cáo kết quả kinh doanh P&L (.csv)</b><div class="small muted">Tổng hợp doanh thu, giá vốn, chi phí hao hụt, nhân công, phụ phẩm & so sánh kỳ trước</div></div>' +
+                UI.badge("Tải CSV", "primary") +
+              "</button>" +
+            "</div>" +
+            '<div class="small muted">Định dạng chuẩn UTF-8 có BOM — mở trực tiếp bằng <b>Microsoft Excel</b> hoặc <b>Google Sheets</b> hiển thị chuẩn tiếng Việt có dấu và cột số nguyên để tính tổng ngay.</div>' +
+          "</div>";
+        },
+        foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
+      });
+    },
+    "owner.exportDailyCsv": () => exportSalesDailyCsv(),
+    "owner.exportInvoicesCsv": (d) => exportSalesInvoicesCsv(d && d.filtered === "1"),
+    "owner.exportItemsCsv": () => exportSalesItemsCsv(),
+    "owner.exportPlCsv": () => exportSalesPlCsv(),
+    "owner.exportAuditCsv": () => exportSalesAuditCsv(),
     "owner.invTab": (d) => {
       S().invTab = d.value;
       App.render();
@@ -940,11 +1620,28 @@
     },
     "owner.exportPayroll": () => {
       const mk = curMonth();
-      const rows = [["Mã NV", "Họ tên", "Vai trò", "Ngày công", "Giờ chuẩn", "Giờ tăng ca", "Lương cơ bản", "Tăng ca & ca đêm", "Thưởng & Tip", "Phạt & Đền", "Đã ứng", "Thực lĩnh"]];
-      D().staff.filter((s) => s.payType && s.payType !== "none").forEach((s) => {
-        const p = Engine.payroll(s.id, mk);
+      const rows = [
+        ["BẢNG TỔNG HỢP LƯƠNG NHÂN VIÊN — " + U.monthLabel(mk).toUpperCase()],
+        ["Đơn vị", C().store.name || "Quán Nhậu OS", "Kỳ lương", mk, "Xuất lúc", U.dateTime(Date.now())],
+        [],
+        ["Mã NV", "Họ tên", "Vai trò", "Ngày công", "Giờ chuẩn", "Giờ tăng ca", "Lương cơ bản (đ)", "Tăng ca & ca đêm (đ)", "Thưởng & Tip (đ)", "Phạt & Đền (đ)", "Đã ứng (đ)", "Thực lĩnh (đ)"],
+      ];
+      const staffList = D().staff.filter((s) => s.payType && s.payType !== "none").map((s) => ({ s, p: Engine.payroll(s.id, mk) }));
+      staffList.forEach(({ s, p }) => {
         rows.push([s.id, s.name, Engine.roleLabel(s.role), p.days, p.regular, p.ot, p.base, (p.otPay || 0) + (p.nightPay || 0), (p.commission || 0) + (p.tips || 0), (p.late || 0) + (p.deductions || 0), p.advances, p.net]);
       });
+      rows.push([
+        "TỔNG CỘNG", staffList.length + " nhân sự", "",
+        U.sum(staffList, (x) => x.p.days),
+        Number(U.sum(staffList, (x) => x.p.regular).toFixed(1)),
+        Number(U.sum(staffList, (x) => x.p.ot).toFixed(1)),
+        U.sum(staffList, (x) => x.p.base),
+        U.sum(staffList, (x) => (x.p.otPay || 0) + (x.p.nightPay || 0)),
+        U.sum(staffList, (x) => (x.p.commission || 0) + (x.p.tips || 0)),
+        U.sum(staffList, (x) => (x.p.late || 0) + (x.p.deductions || 0)),
+        U.sum(staffList, (x) => x.p.advances),
+        U.sum(staffList, (x) => x.p.net),
+      ]);
       U.downloadCsv("bang_luong_" + mk + ".csv", rows);
       App.toast("Đã tải xuống file CSV bảng lương " + U.monthLabel(mk), "success");
     },
@@ -953,22 +1650,55 @@
       const tx = Engine.taxReport(mk);
       const tot = tx.tot;
       const rows = [
-        ["Kỳ thuế", mk],
-        ["Tổng doanh thu", tot.revenue],
-        ["Doanh thu đồ ăn", tot.food],
-        ["Thuế GTGT đồ ăn", tot.vatFood],
-        ["Doanh thu rượu bia", tot.alcohol],
-        ["Thuế GTGT rượu bia", tot.vatAlcohol],
-        ["Tổng thuế GTGT", tot.vatFood + tot.vatAlcohol],
-        ["Thuế khoán HKD", tot.hkdTax],
+        ["BẢNG KÊ DOANH THU CHỊU THUẾ & HÓA ĐƠN ĐIỆN TỬ — " + U.monthLabel(mk).toUpperCase()],
+        ["Đơn vị", C().store.name || "Quán Nhậu OS", "Chế độ kế toán", C().tax.mode === "company" ? "Công ty TNHH" : "Hộ kinh doanh", "Xuất lúc", U.dateTime(Date.now())],
         [],
-        ["Số HĐ / Tham chiếu", "Thời điểm", "Đơn vị mua", "Mã số thuế", "Địa chỉ", "Email", "Số tiền", "Trạng thái"],
+        ["CHỈ TIÊU TỔNG HỢP KỲ THUẾ", "SỐ TIỀN (VNĐ)"],
+        ["Kỳ thuế", mk],
+        ["Tổng số hóa đơn phát sinh", tot.bills || 0],
+        ["Tổng doanh thu chịu thuế", tot.revenue],
+        ["Doanh thu nhóm đồ ăn & dịch vụ", tot.food],
+        ["Thuế GTGT đồ ăn (" + C().tax.food + "%)", tot.vatFood],
+        ["Doanh thu nhóm rượu bia", tot.alcohol],
+        ["Thuế GTGT rượu bia (" + C().tax.alcohol + "%)", tot.vatAlcohol],
+        ["Tổng thuế GTGT đầu ra", tot.vatFood + tot.vatAlcohol],
+        ["Thuế khoán HKD ước tính (" + C().tax.hkdRate + "%)", tot.hkdTax],
+        [],
+        ["BẢNG KÊ DOANH THU & THUẾ GTGT THEO NGÀY"],
+        ["Ngày", "Thứ", "Số hóa đơn", "Doanh thu đồ ăn (đ)", "Thuế GTGT đồ ăn (đ)", "Doanh thu rượu bia (đ)", "Thuế GTGT rượu bia (đ)", "Tổng doanh thu (đ)", "Tổng thuế GTGT (đ)"],
       ];
+      (tx.rows || []).forEach((d) => {
+        rows.push([
+          U.dayLabel(d.dayKey),
+          U.weekday(U.dayStart(d.dayKey)),
+          d.bills || 0,
+          d.food || 0,
+          d.vatFood || 0,
+          d.alcohol || 0,
+          d.vatAlcohol || 0,
+          d.revenue || 0,
+          (d.vatFood || 0) + (d.vatAlcohol || 0),
+        ]);
+      });
+      rows.push([
+        "TỔNG CỘNG",
+        (tx.rows || []).length + " ngày",
+        tot.bills || 0,
+        tot.food,
+        tot.vatFood,
+        tot.alcohol,
+        tot.vatAlcohol,
+        tot.revenue,
+        tot.vatFood + tot.vatAlcohol,
+      ]);
+      rows.push([]);
+      rows.push(["DANH SÁCH YÊU CẦU & HÓA ĐƠN ĐIỆN TỬ GTGT TRONG KỲ"]);
+      rows.push(["Số HĐ / Tham chiếu", "Thời điểm", "Đơn vị mua", "Mã số thuế", "Địa chỉ", "Email", "Số tiền (đ)", "Trạng thái"]);
       (tx.einvoices || []).forEach((e) => {
         rows.push([e.invoiceNo || e.id, U.dateTime(e.at), e.company || "", e.taxCode || "", e.address || "", e.email || "", e.amount || 0, e.status === "requested" ? "Chờ xuất" : "Đã phát hành"]);
       });
       U.downloadCsv("bao_cao_thue_" + mk + ".csv", rows);
-      App.toast("Đã xuất bảng kê thuế " + U.monthLabel(mk), "success");
+      App.toast("Đã xuất bảng kê thuế & doanh thu " + U.monthLabel(mk), "success");
     },
     "owner.issueEInvoice": (d) => {
       const r = App.commit(() => Engine.markEInvoiceIssued(d.id), "Đã đánh dấu phát hành hóa đơn điện tử");

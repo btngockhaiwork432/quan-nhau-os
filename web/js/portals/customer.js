@@ -323,7 +323,7 @@
       '<div class="qr-box cu-qr">' + qr + '<div class="qr-bank"><b>VietQR</b> · quét bằng ứng dụng ngân hàng bất kỳ</div></div>' +
       '<div class="col gap-12 grow"><div class="cu-sec-title" style="margin:0">' + I("landmark") + "Hoặc chuyển khoản thủ công</div>" +
       '<div class="cu-dl">' +
-      copyRow("Ngân hàng", s.bankName) +
+      copyRow("Ngân hàng", (U.bankName && U.bankName(s.bankBin)) || s.bankName || s.bankBin) +
       copyRow("Số tài khoản", s.bankAccount, s.bankAccount, "cu-mono") +
       copyRow("Chủ tài khoản", s.accountName) +
       copyRow("Số tiền", U.money(bk.deposit), String(bk.deposit), "cu-strong-amt") +

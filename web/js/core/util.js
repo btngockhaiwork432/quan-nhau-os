@@ -240,6 +240,50 @@
     val = String(val);
     return id + String(val.length).padStart(2, "0") + val;
   }
+  // Danh muc ngan hang NAPAS 247 ho tro VietQR tai Viet Nam
+  U.BANKS = [
+    { bin: "970436", name: "Vietcombank" },
+    { bin: "970415", name: "VietinBank" },
+    { bin: "970418", name: "BIDV" },
+    { bin: "970405", name: "Agribank" },
+    { bin: "970422", name: "MBBank" },
+    { bin: "970407", name: "Techcombank" },
+    { bin: "970416", name: "ACB" },
+    { bin: "970432", name: "VPBank" },
+    { bin: "970423", name: "TPBank" },
+    { bin: "970403", name: "Sacombank" },
+    { bin: "970437", name: "HDBank" },
+    { bin: "970441", name: "VIB" },
+    { bin: "970443", name: "SHB" },
+    { bin: "970426", name: "MSB" },
+    { bin: "970448", name: "OCB" },
+    { bin: "970440", name: "SeABank" },
+    { bin: "970449", name: "LPBank" },
+    { bin: "970431", name: "Eximbank" },
+    { bin: "970452", name: "KienlongBank" },
+    { bin: "970428", name: "Nam A Bank" },
+    { bin: "970409", name: "Bac A Bank" },
+    { bin: "970425", name: "ABBANK" },
+    { bin: "970433", name: "VietBank" },
+    { bin: "970454", name: "BVBank (Bản Việt)" },
+    { bin: "970412", name: "PVcomBank" },
+    { bin: "970419", name: "NCB" },
+    { bin: "970427", name: "VietABank" },
+    { bin: "970438", name: "BaoVietBank" },
+    { bin: "970400", name: "Saigonbank" },
+    { bin: "970430", name: "PGBank" },
+    { bin: "970414", name: "MBV (OceanBank)" },
+    { bin: "546034", name: "Cake by VPBank" },
+    { bin: "546035", name: "Ubank by VPBank" },
+    { bin: "963388", name: "Timo by BVBank" },
+    { bin: "970457", name: "Woori Bank" },
+    { bin: "970424", name: "Shinhan Bank" },
+  ];
+  U.bankName = function (bin) {
+    const b = U.BANKS.find((x) => String(x.bin) === String(bin || "").trim());
+    return b ? b.name : "";
+  };
+
   // Tao chuoi VietQR dong (NAPAS 247) theo chuan EMVCo
   U.vietQr = function (bin, account, amount, memo) {
     if (bin && typeof bin === "object") {
@@ -248,8 +292,10 @@
       memo = bin.memo;
       bin = bin.bin;
     }
+    const cleanBin = String(bin || "970436").trim();
+    const cleanAcc = String(account || "00000000").trim().replace(/\s+/g, "");
     const memoClean = U.norm(memo || "").replace(/[^a-z0-9 ]/gi, "").toUpperCase().slice(0, 25);
-    const merchant = tlv("00", "A000000727") + tlv("01", tlv("00", bin) + tlv("01", account)) + tlv("02", "QRIBFTTA");
+    const merchant = tlv("00", "A000000727") + tlv("01", tlv("00", cleanBin) + tlv("01", cleanAcc)) + tlv("02", "QRIBFTTA");
     let s = tlv("00", "01") + tlv("01", amount ? "12" : "11") + tlv("38", merchant) + tlv("53", "704");
     if (amount) s += tlv("54", Math.round(amount));
     s += tlv("58", "VN");
@@ -287,17 +333,20 @@
   U.csv = function (rows) {
     return (
       "\ufeff" +
-      rows
+      (rows || [])
         .map((r) =>
-          r
+          (r || [])
             .map((c) => {
               c = c === null || c === undefined ? "" : String(c);
-              return /[",;\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c;
+              return /[",;\r\n]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c;
             })
             .join(",")
         )
         .join("\r\n")
     );
+  };
+  U.downloadCsv = function (filename, rows) {
+    U.download(filename || "bang_ke.csv", U.csv(rows), "text/csv;charset=utf-8");
   };
 
   window.U = U;

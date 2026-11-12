@@ -34,7 +34,9 @@
 .owner-bnav { display: none; }
 @media (max-width: 960px) {
   .app-with-sidebar { grid-template-columns: minmax(0, 1fr); }
-  .owner-bnav { display: grid; }
+  .owner-bnav { display: grid; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; }
+  .owner-shell .main-col { padding-bottom: 76px; }
+  .owner-hide-sm { display: none !important; }
 }
 
 .summary-line {
@@ -121,7 +123,34 @@
 .py-4 { padding-top: 4px; padding-bottom: 4px; }
 .py-8 { padding-top: 8px; padding-bottom: 8px; }
 .pt-8 { padding-top: 8px; }
+.mt-16 { margin-top: 16px; }
 .border-b { border-bottom: 1px solid var(--border); }
+
+/* Range bar, sales statistical tables & CSV export */
+.range-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 100%; }
+.range-seg { max-width: 100%; overflow-x: auto; }
+.custom-dates { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.custom-dates .date-input { width: auto; min-width: 138px; height: 34px; padding: 0 10px; font-size: 13px; }
+.sales-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sales-search { min-width: 260px; flex: 1 1 260px; max-width: 420px; }
+.sale-items-cell { max-width: 280px; white-space: normal; line-height: 1.4; color: var(--text-2); }
+.dt tr.row-dim td { color: var(--text-4); }
+.dt tfoot tr td {
+  background: var(--surface-2);
+  border-top: 2px solid var(--border-strong);
+  font-weight: 700;
+  color: var(--text);
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.export-grid { display: flex; flex-direction: column; gap: 10px; }
+.export-opt {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  width: 100%; padding: 12px 14px; border-radius: var(--radius-lg);
+  border: 1px solid var(--border); background: var(--surface);
+  transition: border-color .15s ease, background .15s ease;
+}
+.export-opt:hover { border-color: var(--primary); background: var(--primary-50); }
 
 @media (max-width: 640px) {
   .owner-kpis.grid-4 {
@@ -137,6 +166,10 @@
   .range-seg {
     max-width: 100%;
     overflow-x: auto;
+  }
+  .sales-search {
+    min-width: 100%;
+    max-width: 100%;
   }
   .card-head {
     flex-wrap: wrap;

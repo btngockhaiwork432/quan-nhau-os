@@ -1,0 +1,39 @@
+========================================================================
+  HUONG DAN CAI DAT NHANH HE THONG MAY IN K80 (QUAN NHAU OS)
+  Mo hinh chuan: 1 Laptop tai Quay + 1 May in USB + 1 May in Bep Wi-Fi
+========================================================================
+
+BUOC 1: CAM DAY VA BAT NGUON MAY IN
+  1. May in Thu ngan (ban USB):
+     - Cam day nguon, bo giay in nhiet K80 (ngua mat giay bong len).
+     - Cam day cap USB tu may in vao cong USB tren Laptop.
+     - Cai Driver Xprinter/POS-80 tren Laptop (tải bản Xprinter Driver V7.77).
+  2. May in Bep (ban Wi-Fi hoac LAN):
+     - Cam day nguon, bo giay in nhiet K80.
+     - Ket noi may in vao Wi-Fi cua quan (hoac cam day mang LAN vao Router).
+
+BUOC 2: TIM CONG USB & DIA CHI IP MAY IN BEP (1 CHAM)
+  - Bam dup chuot vao file: 1_TIM_MAY_IN_TRONG_QUAN.bat
+  - Man hinh se hien ra:
+    + Ten may in USB dang cam tren Laptop (ban chi can dien chu "USB" len web).
+    + Dia chi IP cua May in Bep Wi-Fi/LAN (VD: 192.168.1.201).
+
+BUOC 3: NHAP THONG SO TREN GIAO DIEN CHU QUAN
+  - Mo trinh duyet tren Laptop vao: https://munbao.com/owner/settings
+  - Chon muc: "May in, VietQR & Bill"
+  - Bam nut: "Thiet lap nhanh: 2 may in (1 Thu ngan + 1 Bep)"
+    + Dong May in Thu ngan -> O IP dien: USB
+    + Dong May in Bep      -> O IP dien: IP tim duoc o Buoc 2 (hoac dien chu AUTO)
+  - Bam nut "Luu va ap dung" o thanh duoi cung.
+
+BUOC 4: BAT TU DONG IN TREN LAPTOP
+  - Bam dup chuot vao file: 3_CAI_TU_KHOI_DONG_CUNG_WINDOWS.bat (de tu chay moi ngay).
+  - Bam dup chuot vao file: 2_CHAY_KET_NOI_MAY_IN.bat de bat dau chay ngay.
+  - Quay lai trang web bam nut "In thu" o tung may in -> Giay tu nha ra kem tieng Bip!
+
+LUU Y AN TAM VAN HANH:
+  - Neu rot mang roi co mang lai: Phan mem tu dong ket noi lai va tu in bu
+    cac phieu cho trong 30 phut (khong so in trung hay mat phieu).
+  - Neu Router doi IP may in Bep: Phan mem tu dong quet tim lai may in theo
+    dia chi MAC phan cung va tu cap nhat ket noi ma khong can cai lai.
+========================================================================

@@ -47,17 +47,53 @@
     } catch (e) {}
   }
 
-  /* ---------- Phien dang nhap ---------- */
+  /* ---------- Phien dang nhap (Nho tai khoan tren thiet bi qua localStorage) ---------- */
+  function readSavedSession() {
+    const key = activeSessionKey();
+    try {
+      if (key === DEMO_SESSION_KEY) {
+        return JSON.parse(sessionStorage.getItem(DEMO_SESSION_KEY) || "null");
+      }
+      const rawLocal = localStorage.getItem(SESSION_KEY);
+      if (rawLocal) return JSON.parse(rawLocal);
+      // Tu dong chuyen phien dang nhap cu tu sessionStorage sang localStorage
+      const rawLegacy = sessionStorage.getItem(SESSION_KEY);
+      if (rawLegacy) {
+        localStorage.setItem(SESSION_KEY, rawLegacy);
+        sessionStorage.removeItem(SESSION_KEY);
+        return JSON.parse(rawLegacy);
+      }
+    } catch (e) {}
+    return null;
+  }
   App.session = null;
-  App.me = () => (App.session ? Engine.staff(App.session.staffId) : null);
+  App.me = () => {
+    if (!App.session || !App.session.staffId) return null;
+    const s = Engine.staff(App.session.staffId);
+    return s && s.active !== false ? s : null;
+  };
   App.role = () => (App.me() || {}).role || null;
   App.login = function (staffId) {
     App.session = { staffId, at: Date.now() };
-    sessionStorage.setItem(activeSessionKey(), JSON.stringify(App.session));
+    const key = activeSessionKey();
+    try {
+      if (key === DEMO_SESSION_KEY) sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(App.session));
+      else {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(App.session));
+        sessionStorage.removeItem(SESSION_KEY);
+      }
+    } catch (e) {}
   };
   App.logout = function () {
     App.session = null;
-    sessionStorage.removeItem(activeSessionKey());
+    const key = activeSessionKey();
+    try {
+      if (key === DEMO_SESSION_KEY) sessionStorage.removeItem(DEMO_SESSION_KEY);
+      else {
+        localStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(SESSION_KEY);
+      }
+    } catch (e) {}
   };
 
   /* ---------- Dieu huong (HTML5 History API /path tren Web + fallback #/ tren file://) ---------- */
@@ -132,6 +168,25 @@
     parseHash();
     let pid = App.route.portal;
     if (!App.portals[pid]) pid = "login";
+    // Neu thiet bi da dang nhap san tai khoan con hoat dong, tu dong vao thang giao dien cua tai khoan do (khong bat nhap PIN lai)
+    if (!App.isDemo() && App.session) {
+      const meRemembered = App.me();
+      if (meRemembered) {
+        if (pid === "login") {
+          const homePortal = Engine.portalOfRole(meRemembered.role);
+          if (homePortal && App.portals[homePortal]) {
+            pid = homePortal;
+            App.route = { portal: pid, view: null, sub: null };
+            if (USE_HISTORY && location.pathname !== "/" + pid) {
+              history.replaceState(null, "", "/" + pid + location.search);
+            }
+          }
+        }
+      } else if (Store.backend && Store.backend.connected) {
+        // Tai khoan da bi xoa hoac khoa tren PostgreSQL -> xoa phien cu
+        App.logout();
+      }
+    }
     if (!allowed(pid) && DEMO_USERS[pid] && !document.body.classList.contains("no-demo")) {
       App.login(DEMO_USERS[pid]);
     }
@@ -153,7 +208,12 @@
     const ae = document.activeElement;
     let focus = null;
     if (ae && (ae.id || ae.dataset.model) && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) {
-      focus = { id: ae.id, model: ae.dataset.model, start: ae.selectionStart, end: ae.selectionEnd, inModal: !!ae.closest("#modal-root") };
+      let sStart = null, sEnd = null;
+      try {
+        sStart = ae.selectionStart;
+        sEnd = ae.selectionEnd;
+      } catch (e) {}
+      focus = { id: ae.id, model: ae.dataset.model, start: sStart, end: sEnd, inModal: !!ae.closest("#modal-root") };
     }
     const scrollers = Array.from(document.querySelectorAll("[data-keep-scroll]")).map((el) => [el.dataset.keepScroll, el.scrollTop]);
 
@@ -179,7 +239,13 @@
       if (el) {
         el.focus();
         try {
-          if (focus.start !== null && el.setSelectionRange) el.setSelectionRange(focus.start, focus.end);
+          if (el.type === "number") {
+            const curVal = el.value;
+            el.value = "";
+            el.value = curVal;
+          } else if (focus.start !== null && el.setSelectionRange) {
+            el.setSelectionRange(focus.start, focus.end);
+          }
         } catch (e) {}
       }
     } else {
@@ -222,11 +288,16 @@
 
   /* ---------- Hop thoai ---------- */
   // App.modal({title, sub, body: fn|string, foot: fn|string, size, sheet, onClose})
+  let _modalSeq = 0;
   App.modal = function (opts) {
+    if (!opts._uid) opts._uid = ++_modalSeq;
     if (App._modal) App._modalStack.push(App._modal);
     App._modal = opts;
     App._autofocused = false;
     App.render();
+  };
+  App.sheet = function (opts) {
+    return App.modal(Object.assign({}, opts, { sheet: true }));
   };
   App.closeModal = function (all) {
     const m = App._modal;
@@ -239,26 +310,56 @@
     const root = document.getElementById("modal-root");
     const m = App._modal;
     if (!m) {
-      root.innerHTML = "";
+      if (root.innerHTML !== "") root.innerHTML = "";
       return;
     }
     const val = (x) => (typeof x === "function" ? x() : x || "");
     let body = "",
-      foot = "";
+      foot = "",
+      titleTxt = "",
+      subHtml = "";
     try {
+      titleTxt = val(m.title);
+      subHtml = m.sub ? val(m.sub) : "";
       body = val(m.body);
       foot = val(m.foot);
     } catch (e) {
       console.error(e);
       body = UI.banner("danger", "triangle-alert", esc(e.message));
     }
-    root.innerHTML =
-      '<div class="modal-backdrop ' + (m.sheet ? "sheet-backdrop" : "") + '" data-act="app.backdrop">' +
-      '<div class="modal ' + (m.size ? "modal-" + m.size : "") + (m.sheet ? " sheet" : "") + '" role="dialog" aria-modal="true">' +
-      '<div class="modal-head"><div><h3>' + esc(val(m.title)) + "</h3>" + (m.sub ? '<div class="sub">' + val(m.sub) + "</div>" : "") + "</div>" + UI.iconBtn("x", { act: "app.closeModal", title: "Đóng" }) + "</div>" +
-      '<div class="modal-body" data-keep-scroll="modal">' + body + "</div>" +
-      (foot ? '<div class="modal-foot">' + foot + "</div>" : "") +
-      "</div></div>";
+    const uidStr = String(m._uid || "");
+    const existingModal = root.querySelector(".modal");
+    if (existingModal && uidStr && existingModal.dataset.modalUid === uidStr) {
+      // Giu nguyen khung popup (.modal-backdrop + .modal) de khong bi mat di roi hien lai khi bam + / -
+      const headWrap = existingModal.querySelector(".modal-head > div");
+      if (headWrap) {
+        const nextHeadHtml = "<h3>" + esc(titleTxt) + "</h3>" + (subHtml ? '<div class="sub">' + subHtml + "</div>" : "");
+        if (headWrap.innerHTML !== nextHeadHtml) headWrap.innerHTML = nextHeadHtml;
+      }
+      const bodyEl = existingModal.querySelector(".modal-body");
+      if (bodyEl && bodyEl.innerHTML !== body) {
+        bodyEl.innerHTML = body;
+      }
+      let footEl = existingModal.querySelector(".modal-foot");
+      if (foot) {
+        if (!footEl) {
+          footEl = document.createElement("div");
+          footEl.className = "modal-foot";
+          existingModal.appendChild(footEl);
+        }
+        if (footEl.innerHTML !== foot) footEl.innerHTML = foot;
+      } else if (footEl) {
+        footEl.remove();
+      }
+    } else {
+      root.innerHTML =
+        '<div class="modal-backdrop ' + (m.sheet ? "sheet-backdrop" : "") + '" data-act="app.backdrop">' +
+        '<div class="modal ' + (m.size ? "modal-" + m.size : "") + (m.sheet ? " sheet" : "") + '" data-modal-uid="' + esc(uidStr) + '" role="dialog" aria-modal="true">' +
+        '<div class="modal-head"><div><h3>' + esc(titleTxt) + "</h3>" + (subHtml ? '<div class="sub">' + subHtml + "</div>" : "") + "</div>" + UI.iconBtn("x", { act: "app.closeModal", title: "Đóng" }) + "</div>" +
+        '<div class="modal-body" data-keep-scroll="modal">' + body + "</div>" +
+        (foot ? '<div class="modal-foot">' + foot + "</div>" : "") +
+        "</div></div>";
+    }
     if (App._ciStream) {
       const vid = document.getElementById("ci-live-video");
       if (vid && vid.srcObject !== App._ciStream) {
@@ -1132,10 +1233,7 @@
       document.body.classList.add("no-demo");
     }
     Store.load();
-    try {
-      App.session = JSON.parse(sessionStorage.getItem(activeSessionKey()) || "null");
-      if (App.session && !Engine.staff(App.session.staffId)) App.session = null;
-    } catch (e) {}
+    App.session = readSavedSession();
     try {
       App.ui = JSON.parse(sessionStorage.getItem(UI_KEY) || "{}") || {};
     } catch (e) {

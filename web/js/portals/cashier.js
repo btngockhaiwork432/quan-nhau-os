@@ -57,10 +57,38 @@
       bkTable: "",
       bkDeposit: 300000,
       bkNote: "",
+      paidScope: "",
+      _paidScopeManual: false,
     });
 
   const cfg = () => Store.config;
   const D = () => Store.data;
+
+  function resolvePaidScope() {
+    const st = S();
+    if (st._paidScopeManual && ["today", "shift", "yesterday", "7d", "all"].includes(st.paidScope)) return st.paidScope;
+    const today = U.dayKey();
+    if ((D().sales || []).some((s) => s.dayKey === today)) return "today";
+    const sh = Engine.currentShift();
+    if (sh && Engine.shiftStats(sh).bills > 0) return "shift";
+    return "7d";
+  }
+
+  function paidBillsByScope(scope) {
+    const sc = scope || resolvePaidScope();
+    const today = U.dayKey();
+    const yKey = U.dayKey(Date.now() - 86400000);
+    const [f7] = Engine.rangeKeys("7d");
+    const sh = Engine.currentShift();
+    const all = D().sales || [];
+    let list;
+    if (sc === "today") list = all.filter((s) => s.dayKey === today);
+    else if (sc === "shift") list = sh ? all.filter((s) => s.shiftId === sh.id || s.closedAt >= sh.openedAt) : all.filter((s) => s.dayKey === today);
+    else if (sc === "yesterday") list = all.filter((s) => s.dayKey === yKey);
+    else if (sc === "7d") list = all.filter((s) => s.dayKey >= f7 && s.dayKey <= today);
+    else list = all.slice();
+    return list.slice().sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0));
+  }
 
   function ensureSelectedTable() {
     const st = S();
@@ -81,7 +109,7 @@
     const ss = sh ? Engine.shiftStats(sh) : { opening: 0, cash: 0, qr: 0, expected: 0, petty: 0, tipsPaid: 0, advancesPaid: 0, bills: 0 };
     const openTks = Engine.openTickets();
     const lockedN = openTks.filter((t) => t.status === "locked").length;
-    const kitN = Engine.kitchenQueue().length;
+    const weighN = Engine.weighQueue().length;
     const fishCnt = U.sum(Engine.activeMenu((m) => m.kind === "seafood" && Engine.isCountableSeafood(m)), (m) => Engine.tankFishList(m.id).length);
     const dutyN = Engine.onDuty().length;
     const bks = D().bookings.filter((b) => b.dayKey === U.dayKey() && (b.status === "confirmed" || b.status === "holding" || b.status === "pending_deposit")).length;
@@ -118,7 +146,7 @@
     items.push(
       '<button type="button" class="pos-kpi" data-act="cashier.stockModal" title="Xem chi tiết từng con cá trong bể và số đĩa món làm được">' +
         '<span class="pk-label">Đặt bàn / Bể cá & Kho món</span>' +
-        '<span class="pk-value num">' + bks + " đặt bàn · " + fishCnt + " cá bể · " + kitN + " món đang nấu</span></button>"
+        '<span class="pk-value num">' + bks + " đặt bàn · " + fishCnt + " cá bể · " + (weighN ? weighN + " chờ cân" : cfg().bags.length + " NL bếp") + "</span></button>"
     );
     if (w.staff !== false) {
       items.push(
@@ -138,7 +166,8 @@
     const st = S();
     const openTks = Engine.openTickets();
     const bks = D().bookings.filter((b) => b.dayKey === U.dayKey() && b.status !== "cancelled");
-    const paidTks = D().sales.filter((s) => s.dayKey === U.dayKey()).slice().sort((a, b) => b.closedAt - a.closedAt);
+    const activePaidScope = resolvePaidScope();
+    const paidTks = paidBillsByScope(activePaidScope);
     const cashierPend = Engine.pendingApprovalsByTier ? Engine.pendingApprovalsByTier("cashier") : [];
     const ownerPend = Engine.pendingApprovalsByTier ? Engine.pendingApprovalsByTier("owner") : [];
 
@@ -326,9 +355,24 @@
           }).join("") + "</div>"
         : UI.empty("calendar", "Chưa có lịch đặt bàn", "Bấm Nhận đặt bàn mới hoặc khách đặt trực tiếp trên trang Khách hàng.");
     } else if (st.leftTab === "paid") {
-      headExtra = '<div class="row between"><b>Hóa đơn đã thanh toán trong ca (' + paidTks.length + ')</b><span class="small muted">Hỗ trợ tự động khớp mã QR định danh, tách Tip tự động và phát hành HĐ VAT</span></div>';
+      const scopeChips = [
+        { value: "today", label: "Hôm nay", count: paidBillsByScope("today").length },
+        { value: "shift", label: "Ca đang mở", count: paidBillsByScope("shift").length },
+        { value: "yesterday", label: "Hôm qua", count: paidBillsByScope("yesterday").length },
+        { value: "7d", label: "7 ngày", count: paidBillsByScope("7d").length },
+        { value: "all", label: "Tất cả", count: (D().sales || []).length },
+      ];
+      headExtra =
+        '<div class="row between wrap gap-8">' +
+          '<div><b>Hóa đơn đã thanh toán (' + paidTks.length + ' bill · ' + U.money(U.sum(paidTks, (t) => t.grand || 0)) + ')</b>' +
+          '<div class="small muted">Hỗ trợ tự động khớp mã QR định danh, tách Tip tự động, xuất HĐ VAT và tải bảng kê CSV</div></div>' +
+          UI.btn("Xuất bảng kê CSV", { size: "sm", kind: "primary", icon: "download", act: "cashier.exportPaidCsv", disabled: !paidTks.length }) +
+        "</div>" +
+        UI.chips(scopeChips, activePaidScope, "cashier.paidScope");
+      const totGrand = U.sum(paidTks, (t) => t.grand || 0);
+      const totTip = U.sum(paidTks, (t) => t.tip || 0);
       body = paidTks.length
-        ? '<div class="table-wrap card"><table class="dt"><thead><tr><th>Giờ đóng</th><th>Bàn / Mã QR</th><th>Phục vụ</th><th>Phương thức</th><th class="num">Tổng thu</th><th class="num">Tiền Tip</th><th>HĐ điện tử</th><th></th></tr></thead><tbody>' +
+        ? '<div class="table-wrap card"><table class="dt"><thead><tr><th>Thời gian</th><th>Bàn / Mã QR</th><th>Phục vụ</th><th>Phương thức</th><th class="num">Doanh thu bill</th><th class="num">Tiền Tip</th><th>HĐ điện tử</th><th></th></tr></thead><tbody>' +
           paidTks.map((t) => {
             const tb = Engine.table(t.tableId);
             const pm = t.paymentSource === "webhook_qr" ? UI.badge("Auto Webhook QR", "success") : t.payments && t.payments.length > 1 ? "Kết hợp" : (t.payments && t.payments[0] && t.payments[0].method === "qr" ? "VietQR" : "Tiền mặt");
@@ -336,11 +380,17 @@
             const tipDetail = t.tip > 0
               ? '<b class="text-success num">+' + U.money(t.tip) + '</b><div class="small muted">' + esc(Engine.TIP_MODES[t.tipMode] || "Cá nhân") + "</div>"
               : '<span class="muted">0 đ</span>';
-            return "<tr><td>" + U.time(t.closedAt) + "</td><td><b>" + esc(tb ? tb.code : t.tableCode || t.tableId) + "</b>" + (t.payCode ? '<div class="small muted">' + esc(t.payCode) + "</div>" : "") + "</td><td>" + esc(Engine.staffName(t.waiterId)) + "</td><td>" + pm + '</td><td class="num strong">' + U.money(t.received || t.grand) + '</td><td class="num">' + tipDetail + "</td><td>" +
+            return "<tr><td class=\"nowrap\">" + U.time(t.closedAt) + '<div class="small muted">' + U.dayLabel(t.dayKey || U.dayKey(t.closedAt)) + "</div></td><td><b>" + esc(tb ? tb.code : t.tableCode || t.tableId) + "</b>" + (t.payCode ? '<div class="small muted">' + esc(t.payCode) + "</div>" : "") + "</td><td>" + esc(Engine.staffName(t.waiterId)) + "</td><td>" + pm + '</td><td class="num strong">' + U.money(t.grand || 0) + '</td><td class="num">' + tipDetail + "</td><td>" +
               (einv ? UI.badge("Đã xuất " + (einv.invoiceNo || einv.no), "success") : UI.btn("Xuất HĐ VAT", { size: "sm", icon: "receipt-text", act: "cashier.issueVat", data: { id: t.id } })) +
               '</td><td class="right">' + UI.btn("In lại bill", { size: "sm", icon: "printer", act: "cashier.reprintBill", data: { id: t.id } }) + "</td></tr>";
-          }).join("") + "</tbody></table></div>"
-        : UI.empty("receipt", "Chưa có hóa đơn đã thu trong hôm nay");
+          }).join("") +
+          "</tbody><tfoot><tr>" +
+          '<td colspan="4"><b>TỔNG CỘNG (' + paidTks.length + " hóa đơn)</b></td>" +
+          '<td class="num"><b>' + U.money(totGrand) + "</b></td>" +
+          '<td class="num text-success"><b>' + (totTip ? "+" + U.money(totTip) : "0 đ") + "</b></td>" +
+          '<td colspan="2"></td>' +
+          "</tr></tfoot></table></div>"
+        : UI.empty("receipt", "Chưa có hóa đơn đã thu trong bộ lọc này", "Đổi bộ lọc sang Ca đang mở hoặc 7 ngày để xem hóa đơn trước đó.");
     } else {
       const duty = Engine.onDuty();
       const waitersAll = D().staff.filter((s) => s.role === "waiter" && s.active);
@@ -374,6 +424,10 @@
               let badge;
               if (w.status === "matched_paid") {
                 badge = UI.badge("Đã khớp & Chốt bill", "success");
+              } else if (w.status === "matched_booking_deposit") {
+                badge = UI.badge("Đã nhận cọc đặt bàn", "success");
+              } else if (w.status === "ping_ok") {
+                badge = UI.badge("Kiểm tra kết nối OK", "success");
               } else if (w.status === "partial_paid") {
                 badge = UI.badge(w.reason || "Đã thu 1 phần", "warning");
               } else if (w.status === "resolved_as_tip") {
@@ -388,6 +442,8 @@
                   UI.btn("Cộng vào Tip", { size: "sm", kind: "primary", act: "cashier.resolveOverpaid", data: { id: w.id, mode: "tip" } }) +
                   UI.btn("Đã hoàn tiền", { size: "sm", act: "cashier.resolveOverpaid", data: { id: w.id, mode: "refund" } }) +
                   "</div></div>";
+              } else if (w.status === "unmatched") {
+                badge = UI.badge(w.reason || "Không khớp mã bàn", "warning");
               } else {
                 badge = UI.badge(w.reason || w.status, "danger");
               }
@@ -628,7 +684,28 @@
       size: "lg",
       body: () => {
         const s = S();
-        const curTk = Engine.ticket(tk.id) || tk;
+        const liveTk = Engine.ticket(tk.id);
+        if (!liveTk || liveTk.status === "paid") {
+          const paidSale = (D().sales || []).slice().reverse().find((x) => x.ticketId === tk.id);
+          if (paidSale) {
+            return '<div class="col gap-12">' +
+              UI.banner(
+                "success",
+                "circle-check",
+                "<b>THANH TOÁN VIETQR THÀNH CÔNG!</b> Cổng thanh toán đã xác nhận tiền về tự động và đẩy lệnh in hóa đơn K80 ra máy in Thu ngân."
+              ) +
+              '<div class="grid-3">' +
+                UI.kpi({ label: "Tổng tiền hóa đơn", value: U.money(paidSale.grand || 0) }) +
+                UI.kpi({ label: "Thực nhận qua ngân hàng", value: U.money(paidSale.received || paidSale.grand || 0), tone: "good" }) +
+                UI.kpi({ label: "Tiền Tip ghi nhận", value: paidSale.tip > 0 ? "+" + U.money(paidSale.tip) : "0 đ", tone: paidSale.tip > 0 ? "good" : "" }) +
+              "</div>" +
+              '<div class="small muted">Mã định danh QR: <b>' + esc(paidSale.payCode || payCode) + "</b>" +
+                (paidSale.webhookTxId ? " · Mã giao dịch NH: <code>" + esc(paidSale.webhookTxId) + "</code>" : "") +
+              "</div></div>";
+          }
+          return UI.banner("success", "circle-check", "Hóa đơn đã được thanh toán hoàn tất.");
+        }
+        const curTk = liveTk;
         const curTot = Engine.totals(curTk);
         const grand = Math.max(0, curTot.due !== undefined ? curTot.due : curTot.grand - curTot.deposit - (curTot.paid || 0));
         const pendingAps = Engine.pendingTicketApprovals ? Engine.pendingTicketApprovals(curTk.id) : [];
@@ -710,8 +787,16 @@
 
         return partialBanner + pendingApBanner + tabs + pane + UI.totals(curTk);
       },
-      foot: () => UI.btn("Đóng", { act: "app.closeModal" }) +
-        UI.btn("Xác nhận đã thu tiền & In hóa đơn", { kind: "primary", size: "lg", icon: "check", act: "cashier.payConfirm", data: { id: tk.id } }),
+      foot: () => {
+        const liveTk = Engine.ticket(tk.id);
+        if (!liveTk || liveTk.status === "paid") {
+          const paidSale = (D().sales || []).slice().reverse().find((x) => x.ticketId === tk.id);
+          return (paidSale ? UI.btn("Xem & In lại hóa đơn K80", { icon: "printer", act: "cashier.reprintBill", data: { id: paidSale.id } }) : "") +
+            UI.btn("Hoàn tất & Đóng", { kind: "primary", icon: "check", act: "app.closeModal" });
+        }
+        return UI.btn("Đóng", { act: "app.closeModal" }) +
+          UI.btn("Xác nhận đã thu tiền & In hóa đơn", { kind: "primary", size: "lg", icon: "check", act: "cashier.payConfirm", data: { id: tk.id } });
+      },
     });
   }
 
@@ -914,11 +999,18 @@
               "</div>";
           }
         }
+        const liveTk = Engine.ticket(tk.id) || tk;
+        const onTableMap = {};
+        (liveTk.items || []).forEach((it) => {
+          if (it.status === "void" || it.status === "voided" || it.isFree) return;
+          const mObj = Engine.menu(it.menuId);
+          onTableMap[it.menuId] = (onTableMap[it.menuId] || 0) + (mObj && mObj.kind === "seafood" ? (it.count || 1) : (Number(it.qty) || 1));
+        });
         const cats = [{ value: "all", label: "Tất cả" }].concat(cfg().categories.map((c) => ({ value: c.id, label: c.name })));
         const list = Engine.activeMenu((m) => (s.addCat === "all" || m.categoryId === s.addCat) && (!s.addQ || U.match(m.name, s.addQ)));
         return UI.search({ id: "pos-add-q", model: "cashier.addQ", value: s.addQ, placeholder: "Tìm tên món..." }) +
           UI.chips(cats, s.addCat, "cashier.addCat") +
-          '<div class="grid-3" style="max-height:380px;overflow-y:auto">' +
+          '<div class="grid-3" data-keep-scroll="pos-add-grid" style="max-height:380px;overflow-y:auto">' +
           list.map((m) => {
             const p = m.kind === "seafood"
               ? U.money(m.pricePerKg) + "/kg"
@@ -927,10 +1019,14 @@
               : U.money(m.price) + "/" + (m.unit || "phần");
             const avail = Engine.menuAvailability(m.id);
             const out = avail.maxPortions <= 0;
+            const curOnTb = onTableMap[m.id] || 0;
+            const onTbBadge = curOnTb > 0
+              ? '<span class="badge badge-primary" style="flex-shrink:0">Đã có: ' + curOnTb + "</span>"
+              : "";
             const fishPills = m.kind === "seafood" && avail.fishList && avail.fishList.length
               ? '<div class="mi-fish-pills mt-4">' + avail.fishList.slice(0, 3).map((f) => '<span class="fish-pill">' + esc(f.code) + ": " + U.num(f.kg, 2) + "kg</span>").join("") + (avail.fishList.length > 3 ? '<span class="fish-pill more">+' + (avail.fishList.length - 3) + "</span>" : "") + "</div>"
               : "";
-            return '<button type="button" class="opt-card' + (out ? " is-out" : "") + '" data-act="cashier.addDishPick" data-menu="' + m.id + '"' + (out ? " disabled" : "") + '><div><b>' + esc(m.name) + '</b><div class="small muted">' + p + '</div><div class="mi-avail tone-' + (avail.tone || "good") + ' mt-4">' + esc(avail.label) + "</div>" + fishPills + "</div></button>";
+            return '<button type="button" class="opt-card' + (out ? " is-out" : "") + (curOnTb > 0 ? " active" : "") + '" data-act="cashier.addDishPick" data-menu="' + m.id + '"' + (out ? " disabled" : "") + '><div style="width:100%"><div class="row between gap-6"><b>' + esc(m.name) + "</b>" + onTbBadge + '</div><div class="small muted">' + p + '</div><div class="mi-avail tone-' + (avail.tone || "good") + ' mt-4">' + esc(avail.label) + "</div>" + fishPills + "</div></button>";
           }).join("") + "</div>";
       },
       foot: () => UI.btn("Đóng", { kind: "primary", act: "app.closeModal" }),
@@ -1101,8 +1197,16 @@
         if (!p.failed && Date.now() - (p.at || 0) < 30000) fresh.push(p);
       }
     });
-    if (isAutoPrintOn() && fresh.length && App.current === P) {
-      App.printReceiptDoc(fresh[0]);
+    if (fresh.length && App.current === P) {
+      fresh.forEach((p) => {
+        const trig = p.by && Engine.staff(p.by);
+        if (p.kind === "prebill" && trig && trig.role === "waiter") {
+          App.toast("Phục vụ " + trig.name + " vừa bấm Thanh toán Bàn " + (p.tableCode || "") + " — Đã chuyển in bill tại quầy!", "info", { ms: 4500 });
+        }
+      });
+      if (isAutoPrintOn()) {
+        App.printReceiptDoc(fresh[0]);
+      }
     }
   }
 
@@ -1955,21 +2059,67 @@
     },
 
     /* ---- Hóa đơn đã thu & VAT ---- */
+    "cashier.paidScope": (d) => {
+      S().paidScope = d.value || "today";
+      S()._paidScopeManual = true;
+      App.render();
+    },
+    "cashier.exportPaidCsv": () => {
+      const sc = resolvePaidScope();
+      const list = paidBillsByScope(sc);
+      if (!list.length) return App.toast("Không có hóa đơn để xuất.", "info");
+      const scopeLabel = sc === "today" ? "Hôm nay" : sc === "shift" ? "Ca đang mở" : sc === "yesterday" ? "Hôm qua" : sc === "7d" ? "7 ngày qua" : "Tất cả";
+      const rows = [
+        ["BẢNG KÊ HÓA ĐƠN ĐÃ THU TẠI QUẦY THU NGÂN — " + scopeLabel.toUpperCase()],
+        ["Đơn vị", cfg().store.name || "Quán Nhậu OS", "Người xuất", App.me().name, "Xuất lúc", U.dateTime(Date.now())],
+        [],
+        ["STT", "Mã hóa đơn", "Mã QR", "Ngày vận hành", "Giờ đóng", "Bàn", "Số khách", "Phục vụ", "Thu ngân", "Phương thức", "Chi tiết món", "Doanh thu bill (đ)", "Tiền mặt (đ)", "VietQR (đ)", "Tiền Tip (đ)", "HĐ điện tử"],
+      ];
+      list.forEach((t, idx) => {
+        const tb = Engine.table(t.tableId);
+        const cashAmt = U.sum((t.payments || []).filter((p) => p.method === "cash"), (p) => p.amount);
+        const qrAmt = U.sum((t.payments || []).filter((p) => p.method !== "cash"), (p) => p.amount);
+        const pmText = t.paymentSource === "webhook_qr" ? "Auto Webhook QR" : cashAmt > 0 && qrAmt > 0 ? "Kết hợp" : qrAmt > 0 ? "VietQR" : "Tiền mặt";
+        const einv = t.einvoice || (D().einvoices || []).find((e) => e.saleId === t.id);
+        const itemsText = (t.lines || []).filter((ln) => ln.status !== "void").map((ln) => (ln.kg ? U.num(ln.kg, 2) + "kg " : (ln.qty || 1) + "x ") + ln.name + (ln.isFree ? " (Tặng)" : "")).join("; ");
+        rows.push([
+          idx + 1,
+          t.id,
+          t.payCode || "",
+          U.dayLabel(t.dayKey || U.dayKey(t.closedAt)),
+          U.time(t.closedAt),
+          tb ? tb.code : t.tableCode || t.tableId || "",
+          t.guests || 1,
+          Engine.staffName(t.waiterId),
+          Engine.staffName(t.cashierId),
+          pmText,
+          itemsText,
+          t.grand || 0,
+          cashAmt,
+          qrAmt,
+          t.tip || 0,
+          einv ? (einv.invoiceNo || einv.no || "Đã xuất") : "Chưa xuất",
+        ]);
+      });
+      rows.push([
+        "TỔNG CỘNG",
+        list.length + " hóa đơn",
+        "", "", "", "",
+        U.sum(list, (t) => t.guests || 0),
+        "", "", "", "",
+        U.sum(list, (t) => t.grand || 0),
+        U.sum(list, (t) => U.sum((t.payments || []).filter((p) => p.method === "cash"), (p) => p.amount)),
+        U.sum(list, (t) => U.sum((t.payments || []).filter((p) => p.method !== "cash"), (p) => p.amount)),
+        U.sum(list, (t) => t.tip || 0),
+        "",
+      ]);
+      U.downloadCsv("bang_ke_thu_ngan_" + sc + "_" + U.dayKey() + ".csv", rows);
+      App.toast("Đã xuất bảng kê " + list.length + " hóa đơn thu ngân (" + scopeLabel + ")", "success");
+    },
     "cashier.reprintBill": (d) => {
       const s = Engine.saleById(d.id);
       if (!s) return;
-      const logged = D().printLog.find((p) => p.saleId === s.id);
-      const doc = logged || {
-        kind: "receipt",
-        title: "HÓA ĐƠN THANH TOÁN (BẢN SAO)",
-        header: [cfg().store.name, cfg().store.address, "ĐT: " + cfg().store.phone],
-        meta: [{ l: "Bàn", r: s.tableCode || s.tableId }, { l: "Giờ đóng", r: U.time(s.closedAt) }, { l: "Số khách", r: String(s.guests || 4) }],
-        rows: (s.lines || []).map((ln) => ({ l: (ln.kg ? U.num(ln.kg, 2) + "kg " : ln.qty + "x ") + ln.name, r: U.moneyPlain(ln.amount) })),
-        sumRows: [{ l: "TỔNG CỘNG", r: U.moneyPlain(s.grand), bold: true }],
-        qr: cfg().receipt.showQr && Engine.invoiceQrUrl ? Engine.invoiceQrUrl(s.id) : null,
-        qrLabel: cfg().receipt.footer,
-        saleId: s.id,
-      };
+      const doc = Engine.saleReceiptDoc ? Engine.saleReceiptDoc(s) : D().printLog.find((p) => p.saleId === s.id);
       App.modal({
         title: "Bản sao hóa đơn thanh toán",
         size: "sm",

@@ -190,8 +190,6 @@
           voidBeforeSend: true,
           transferTable: true,
           requestPrebill: true,
-          collectPayment: true,
-          collectCash: true,
           createBottleKeep: true,
           viewTableTotal: true,
         },
@@ -716,7 +714,7 @@
         if (this._lastWakeSync && now - this._lastWakeSync < 1500) return;
         this._lastWakeSync = now;
         this.syncFromPostgres(false).catch(() => {});
-        if (!this._sse || this._sse.readyState === 2) {
+        if (!this._sse || this._sse.readyState === 2 || !this.backend.connected) {
           try { if (this._sse) this._sse.close(); } catch (e) {}
           this._sse = null;
           this.connectSse();
@@ -857,11 +855,23 @@
         this.backend.connected = false;
       }
     },
+    _checkUiVersion(remoteVer) {
+      if (!remoteVer || !window.__QN_UI_VER || remoteVer === window.__QN_UI_VER) return;
+      try {
+        const guardKey = "qn_reloaded_" + remoteVer;
+        if (sessionStorage.getItem(guardKey)) return;
+        const ae = document.activeElement;
+        if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
+        sessionStorage.setItem(guardKey, "1");
+        location.reload();
+      } catch (e) {}
+    },
     async fetchDbOverview() {
       try {
         const resp = await fetch(this.apiBase + "/api/db/overview", { cache: "no-store" });
         if (!resp.ok) return null;
         const ov = await resp.json();
+        this._checkUiVersion(ov.uiVersion);
         this.backend.connected = true;
         this.backend.engine = ov.engine || "PostgreSQL";
         this.backend.database = ov.database || "quan_nhau_os";
@@ -899,6 +909,7 @@
           try {
             const msg = JSON.parse(ev.data);
             if (msg.type === "connected") {
+              this._checkUiVersion(msg.uiVersion);
               this.backend.connected = true;
               if (msg.revision && msg.revision > this.backend.revision) {
                 this.syncFromPostgres(false);
@@ -914,8 +925,14 @@
               this.backend.connected = true;
               this.syncFromPostgres(false).then(() => {
                 if (window.App && App.toast) {
-                  const tipTxt = msg.tip > 0 ? " · Tip +" + U.money(msg.tip) : "";
-                  App.toast("THANH TOÁN VIETQR THÀNH CÔNG: Bàn " + (msg.tableCode || "") + " (" + U.money(msg.amount || 0) + tipTxt + ")", "success");
+                  if (msg.overpaid) {
+                    App.toast(msg.reason || ("CẢNH BÁO: Bàn " + (msg.tableCode || "") + " chuyển khoản trùng " + U.money(msg.amount || 0)), "error");
+                  } else if (msg.partial) {
+                    App.toast("Bàn " + (msg.tableCode || "") + " vừa chuyển khoản " + U.money(msg.amount || 0) + " · Còn thiếu " + U.money(msg.remaining || 0), "info");
+                  } else {
+                    const tipTxt = msg.tip > 0 ? " · Tip +" + U.money(msg.tip) : "";
+                    App.toast("THANH TOÁN VIETQR THÀNH CÔNG: Bàn " + (msg.tableCode || "") + " (" + U.money(msg.amount || 0) + tipTxt + ")", "success");
+                  }
                 }
               });
             }

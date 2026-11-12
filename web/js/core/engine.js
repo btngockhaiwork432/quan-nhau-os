@@ -1308,6 +1308,7 @@
       ticketId: tk.id,
       tableId: tk.tableId,
       tableCode: tblCode,
+      by: by || null,
       qr: cfg.receipt.showQr ? U.vietQr(cfg.store.bankBin, cfg.store.bankAccount, lockQrAmt ? amt : 0, payCode) : null,
       qrLabel: lockQrAmt
         ? "Quét VietQR · Nội dung định danh: " + payCode
@@ -1322,6 +1323,15 @@
     tk.prebillInvalidatedReason = null;
     if (cfg.locks.prebillLock) tk.status = "locked";
     clearNotify("prebill_request", ticketId);
+    const stBy = by ? E.staff(by) : null;
+    if (stBy && stBy.role === "waiter") {
+      notify("prebill_printed", {
+        ticketId: tk.id,
+        tableId: tk.tableId,
+        by,
+        text: stBy.name + " vừa bấm Thanh toán Bàn " + tblCode + " — Đã chuyển in bill tại quầy (" + U.money(amt) + ")",
+      });
+    }
     return doc;
   };
 
@@ -1948,7 +1958,8 @@
     sh.closedAt = z.closedAt;
     sh.z = z;
     D().shiftsHistory.unshift(z);
-    E.rollupDay(sh.dayKey, z);
+    const rollupKeys = Array.from(new Set([sh.dayKey].concat((st.sales || []).map((s) => s.dayKey)).filter(Boolean)));
+    rollupKeys.forEach((dk) => E.rollupDay(dk, dk === sh.dayKey ? z : null));
     E.print("p_cashier", { kind: "z", title: "BÁO CÁO CHỐT CA", header: [C().store.name], meta: [{ l: "Ca", r: U.dayLabel(sh.dayKey) }, { l: "Mở ca", r: U.time(sh.openedAt) }, { l: "Chốt ca", r: U.time(z.closedAt) }, { l: "Thu ngân", r: E.staffName(sh.cashierId) }], rows: [{ l: "Số bill", r: String(z.bills) }, { l: "Doanh thu", r: U.moneyPlain(z.revenue) }, { l: "Tiền mặt thu", r: U.moneyPlain(z.cash) }, { l: "Chuyển khoản VietQR", r: U.moneyPlain(z.qr) }, { l: "Chi vặt", r: "-" + U.moneyPlain(z.petty) }, { l: "Trả tip tiền mặt", r: "-" + U.moneyPlain(z.tipsPaid) }, { l: "Chi ứng lương", r: "-" + U.moneyPlain(z.advancesPaid) }], sumRows: [{ l: "Tiền mặt phải có", r: U.moneyPlain(z.expected) }, { l: "Tiền mặt thực đếm", r: U.moneyPlain(z.counted) }, { l: "Chênh lệch", r: U.moneyPlain(z.variance), bold: true }], footer: [z.note ? "Giải trình: " + z.note : "Không chênh lệch", "Ca đã khóa sổ - không thể sửa"] });
     return z;
   };
@@ -2832,21 +2843,103 @@
       gross: revenue - cogs, net: revenue - cogs - wastage - labor, utility: Math.round(food * 0.041),
     };
   };
-  // Gop lich su + ngay hom nay (song)
+  function normalizeDayKeyBound(key) {
+    const parts = String(key || "").split("-").map(Number);
+    if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return U.dayKey();
+    const y = parts[0];
+    const m = Math.min(12, Math.max(1, parts[1]));
+    const maxD = new Date(y, m, 0).getDate();
+    const d = Math.min(maxD, Math.max(1, parts[2]));
+    return y + "-" + U.pad(m) + "-" + U.pad(d);
+  }
+
+  // Gop lich su dailyStats + hoa don thuc te trong D().sales (khong bo sot ngay chua chot ca) + ngay hom nay (song)
   E.days = function (fromKey, toKey) {
+    let fKey = normalizeDayKeyBound(fromKey || U.dayKey());
+    let tKey = normalizeDayKeyBound(toKey || fKey);
+    if (fKey > tKey) {
+      const tmp = fKey;
+      fKey = tKey;
+      tKey = tmp;
+    }
     const today = U.dayKey();
-    const out = D().dailyStats.filter((d) => d.dayKey >= fromKey && d.dayKey <= toKey && d.dayKey !== today).map((d) => {
-      const row = Object.assign({}, d);
-      const expected = (Number(row.food) || 0) + (Number(row.alcohol) || 0) + (Number(row.vipFee) || 0) - (Number(row.discount) || 0);
-      if (expected > 0 && row.revenue !== expected) {
-        row.revenue = expected;
-        row.qr = Math.max(0, row.revenue - (Number(row.cash) || 0));
-      }
-      return row;
+    const dsMap = {};
+    (D().dailyStats || []).forEach((d) => {
+      if (d && d.dayKey) dsMap[d.dayKey] = d;
     });
-    if (today >= fromKey && today <= toKey) {
-      const l = E.liveDay(today);
-      out.push({ dayKey: today, revenue: l.revenue, food: l.food, alcohol: l.alcohol, cogs: l.cogs, cash: l.cash, qr: l.qr, bills: l.bills, guests: l.guests, wastage: l.wastage, labor: l.labor, utility: l.utility, tips: l.tips, vipFee: l.vipFee, discount: l.discount, live: true });
+    const salesByDay = {};
+    (D().sales || []).forEach((s) => {
+      if (s && s.dayKey) (salesByDay[s.dayKey] = salesByDay[s.dayKey] || []).push(s);
+    });
+
+    const out = [];
+    let curMs = U.dayStart(fKey) + 6 * 3600000;
+    const endMs = U.dayStart(tKey) + 6 * 3600000;
+    let guard = 0;
+    while (curMs <= endMs + 1000 && guard < 800) {
+      guard++;
+      const key = U.dayKey(curMs);
+      const ds = dsMap[key];
+      const daySales = salesByDay[key] || [];
+      if (key === today || (daySales.length > 0 && (!ds || daySales.length >= (Number(ds.bills) || 0)))) {
+        const l = E.liveDay(key);
+        out.push({
+          dayKey: key,
+          revenue: l.revenue,
+          food: l.food,
+          alcohol: l.alcohol,
+          cogs: l.cogs,
+          cash: l.cash,
+          qr: l.qr,
+          bills: l.bills,
+          guests: l.guests,
+          wastage: l.wastage,
+          labor: Math.round(l.labor || 0),
+          utility: ds && ds.utility ? Number(ds.utility) : l.utility,
+          tips: l.tips,
+          vipFee: l.vipFee,
+          discount: l.discount,
+          variance: ds ? Number(ds.variance) || 0 : 0,
+          closedBy: ds ? ds.closedBy : null,
+          locked: ds ? !!ds.locked : false,
+          live: key === today || !ds,
+        });
+      } else if (ds) {
+        const row = Object.assign({}, ds);
+        const expected = (Number(row.food) || 0) + (Number(row.alcohol) || 0) + (Number(row.vipFee) || 0) - (Number(row.discount) || 0);
+        if (expected > 0 && row.revenue !== expected) {
+          row.revenue = expected;
+          row.qr = Math.max(0, row.revenue - (Number(row.cash) || 0));
+        }
+        row.live = false;
+        out.push(row);
+      } else {
+        const wastage = U.sum((D().wastage || []).filter((w) => U.dayKey(w.at) === key && w.status !== "rejected"), (w) => w.amount);
+        const labor = Math.round(E.laborCostOfDay(key) || 0);
+        out.push({
+          dayKey: key,
+          revenue: 0,
+          food: 0,
+          alcohol: 0,
+          cogs: 0,
+          cash: 0,
+          qr: 0,
+          bills: 0,
+          guests: 0,
+          wastage,
+          labor,
+          utility: 0,
+          tips: 0,
+          vipFee: 0,
+          discount: 0,
+          variance: 0,
+          locked: false,
+          live: key === today,
+        });
+      }
+      const nextDate = new Date(curMs);
+      nextDate.setDate(nextDate.getDate() + 1);
+      curMs = nextDate.getTime();
     }
     return out.sort((a, b) => (a.dayKey < b.dayKey ? -1 : 1));
   };
@@ -2896,7 +2989,8 @@
     if (lastCount && lastCount.varianceStatus === "pending") out.push({ level: "danger", icon: "scale", title: "Lệch kiểm kho chưa xử lý", detail: "Ngày " + U.dayLabel(lastCount.dayKey) + " · giá trị " + U.money(lastCount.varianceValue || 0) });
     const offline = C().printers.filter((p) => !p.online);
     offline.forEach((p) => out.push({ level: "danger", icon: "printer", title: p.name + " mất kết nối", detail: p.backupId ? "Đang in tạm sang " + ((E.printer(p.backupId) || {}).name || "") : "Không có máy dự phòng" }));
-    const recent = D().dailyStats.slice(-7);
+    const [r7From, r7To] = E.rangeKeys("7d");
+    const recent = E.days(r7From, r7To);
     const util = E.summarize(recent).utilityPct;
     if (util > C().inventory.utilityCap) out.push({ level: "warning", icon: "flame", title: "Chi phí phụ phẩm " + U.pct(util) + " doanh thu bếp", detail: "Vượt trần " + C().inventory.utilityCap + "% (7 ngày gần nhất)" });
     const negVar = D().shiftsHistory.filter((z) => z.variance < 0).slice(0, 3);
@@ -2905,12 +2999,96 @@
   };
   E.topItems = function (fromKey, toKey, n) {
     const agg = {};
-    D().sales.filter((s) => s.dayKey >= fromKey && s.dayKey <= toKey).forEach((s) => s.lines.forEach((l) => {
-      if (l.isFree || l.status === "void") return;
-      const a = (agg[l.menuId] = agg[l.menuId] || { menuId: l.menuId, name: l.name, qty: 0, kg: 0, amount: 0, cost: 0 });
-      a.qty += l.qty; a.kg += l.kg || 0; a.amount += l.amount; a.cost += l.cost;
+    D().sales.filter((s) => s.dayKey >= fromKey && s.dayKey <= toKey).forEach((s) => (s.lines || []).forEach((l) => {
+      if (l.status === "void") return;
+      const a = (agg[l.menuId] = agg[l.menuId] || { menuId: l.menuId, name: l.name, qty: 0, freeQty: 0, kg: 0, amount: 0, cost: 0 });
+      if (l.isFree) {
+        a.freeQty += Number(l.qty) || 0;
+        a.cost += Number(l.cost) || 0;
+      } else {
+        a.qty += Number(l.qty) || 0;
+        a.kg += Number(l.kg) || 0;
+        a.amount += Number(l.amount) || 0;
+        a.cost += Number(l.cost) || 0;
+      }
     }));
     return Object.values(agg).sort((a, b) => b.amount - a.amount).slice(0, n || 10);
+  };
+  E.saleReceiptDoc = function (s) {
+    if (!s) return null;
+    const logged = (D().printLog || []).find((p) => p.saleId === s.id);
+    if (logged) return logged;
+    const cfg = C();
+    const sumRows = [{ l: "Cộng tiền hàng", r: U.moneyPlain(s.subtotal || s.grand || 0) }];
+    if (s.vipFee) sumRows.push({ l: "Phụ thu phòng VIP", r: U.moneyPlain(s.vipFee) });
+    if (s.discount) sumRows.push({ l: "Giảm giá", r: "-" + U.moneyPlain(s.discount) });
+    sumRows.push({ l: "TỔNG CỘNG", r: U.moneyPlain(s.grand || 0), bold: true, big: true });
+    if (s.deposit) sumRows.push({ l: "Đã đặt cọc", r: "-" + U.moneyPlain(s.deposit) });
+    const vatNote = [];
+    Object.keys(s.vat || {}).forEach((g) => {
+      const vg = s.vat[g] || {};
+      if (vg.vat > 0) vatNote.push("Thuế GTGT (" + (g === "alcohol" ? "Bia rượu" : "Đồ ăn") + (vg.rate ? " " + vg.rate + "%" : "") + "): " + U.moneyPlain(vg.vat));
+    });
+    return {
+      kind: "receipt",
+      title: "HÓA ĐƠN THANH TOÁN (BẢN SAO)",
+      header: [cfg.store.name, cfg.store.address, "ĐT: " + cfg.store.phone],
+      meta: [
+        { l: "Bàn", r: s.tableCode || s.tableId },
+        { l: "Ngày", r: U.dayLabel(s.dayKey || U.dayKey(s.closedAt)) },
+        { l: "Giờ vào - ra", r: U.time(s.openedAt) + " - " + U.time(s.closedAt) },
+        { l: "Số khách", r: String(s.guests || 1) },
+        { l: "Phục vụ / Thu ngân", r: U.shortName(E.staffName(s.waiterId)) + " / " + U.shortName(E.staffName(s.cashierId)) },
+      ],
+      rows: (s.lines || []).filter((ln) => ln.status !== "void").map((ln) => ({
+        l: (ln.kg ? U.num(ln.kg, 2) + "kg " : ln.qty + "x ") + ln.name + (ln.isFree ? " (Tặng)" : ""),
+        r: U.moneyPlain(ln.amount || 0),
+      })),
+      sumRows,
+      payments: s.payments || [],
+      change: s.change || 0,
+      tip: s.tip || 0,
+      vatNote,
+      qr: cfg.receipt.showQr && E.invoiceQrUrl ? E.invoiceQrUrl(s.id) : null,
+      qrLabel: cfg.receipt.footer,
+      saleId: s.id,
+      footer: [cfg.store.thanks].filter(Boolean),
+    };
+  };
+  E.salesBreakdown = function (fromKey, toKey) {
+    const fKey = normalizeDayKeyBound(fromKey || U.dayKey());
+    const tKey = normalizeDayKeyBound(toKey || fKey);
+    const lo = fKey <= tKey ? fKey : tKey;
+    const hi = fKey <= tKey ? tKey : fKey;
+    const days = E.days(lo, hi);
+    const summary = E.summarize(days);
+    const sales = (D().sales || [])
+      .filter((s) => s && s.dayKey >= lo && s.dayKey <= hi)
+      .slice()
+      .sort((a, b) => (b.closedAt || 0) - (a.closedAt || 0))
+      .map((s) => {
+        const cashAmt = U.sum((s.payments || []).filter((p) => p.method === "cash"), (p) => p.amount);
+        const qrAmt = U.sum((s.payments || []).filter((p) => p.method === "qr"), (p) => p.amount);
+        const cardAmt = U.sum((s.payments || []).filter((p) => p.method === "card"), (p) => p.amount);
+        const foodAmt = saleFoodGross(s);
+        const alcoholAmt = saleAlcoholGross(s);
+        const vatFood = (s.vat && s.vat.food && s.vat.food.vat) || 0;
+        const vatAlcohol = (s.vat && s.vat.alcohol && s.vat.alcohol.vat) || 0;
+        const tb = E.table(s.tableId);
+        const area = tb ? E.area(tb.areaId) : null;
+        return Object.assign({}, s, {
+          cashAmt,
+          qrAmt,
+          cardAmt,
+          foodAmt,
+          alcoholAmt,
+          vatFood,
+          vatAlcohol,
+          areaName: area ? area.name : "",
+          grossProfit: (Number(s.grand) || 0) - (Number(s.cost) || 0),
+        });
+      });
+    return { from: lo, to: hi, days, summary, sales };
   };
   E.revenueByHour = function (key) {
     const hours = {};
@@ -2919,17 +3097,19 @@
   };
   E.taxReport = function (monthKey) {
     const from = monthKey + "-01";
-    const to = monthKey + "-31";
+    let to = normalizeDayKeyBound(monthKey + "-31");
+    const today = U.dayKey();
+    if (monthKey === today.slice(0, 7) && to > today) to = today;
     const days = E.days(from, to);
     const rf = E.vatRate("food"), ra = E.vatRate("alcohol");
     const inc = C().tax.pricesIncludeVat;
     const rows = days.map((d) => {
-      const foodWithVip = (Number(d.food) || 0) + (Number(d.vipFee) || 0) - (Number(d.discount) || 0);
+      const foodWithVip = Math.max(0, (Number(d.food) || 0) + (Number(d.vipFee) || 0) - (Number(d.discount) || 0));
       const vf = inc ? Math.round((foodWithVip * rf) / (100 + rf)) : Math.round((foodWithVip * rf) / 100);
       const va = inc ? Math.round((d.alcohol * ra) / (100 + ra)) : Math.round((d.alcohol * ra) / 100);
-      return { dayKey: d.dayKey, food: foodWithVip, alcohol: d.alcohol, revenue: d.revenue, vatFood: vf, vatAlcohol: va, live: d.live };
+      return { dayKey: d.dayKey, bills: Number(d.bills) || 0, food: foodWithVip, alcohol: Number(d.alcohol) || 0, revenue: Number(d.revenue) || 0, vatFood: vf, vatAlcohol: va, live: d.live };
     });
-    const tot = { food: U.sum(rows, (r) => r.food), alcohol: U.sum(rows, (r) => r.alcohol), revenue: U.sum(rows, (r) => r.revenue), vatFood: U.sum(rows, (r) => r.vatFood), vatAlcohol: U.sum(rows, (r) => r.vatAlcohol) };
+    const tot = { bills: U.sum(rows, (r) => r.bills), food: U.sum(rows, (r) => r.food), alcohol: U.sum(rows, (r) => r.alcohol), revenue: U.sum(rows, (r) => r.revenue), vatFood: U.sum(rows, (r) => r.vatFood), vatAlcohol: U.sum(rows, (r) => r.vatAlcohol) };
     const hkdRate = Number(C().tax.hkdRate) || 0;
     tot.hkdTax = Math.round((tot.revenue * hkdRate) / 100);
     tot.hkdVat = Math.round((tot.revenue * 3) / 100);

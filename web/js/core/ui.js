@@ -139,10 +139,11 @@
     const lockAmt = o.lockAmount !== undefined ? !!o.lockAmount : !!rc.qrLockAmount;
     const qrAmt = lockAmt ? (o.amount || 0) : 0;
     const payload = U.vietQr(s.bankBin || "970436", s.bankAccount || "00000000", qrAmt, o.memo || "");
+    const bName = (U.bankName && U.bankName(s.bankBin)) || s.bankName || s.bankBin || "Ngân hàng";
     return '<div class="qr-box">' +
       (o.caption ? '<div class="small strong">' + esc(o.caption) + "</div>" : "") +
       U.qrSvg(payload, o.size || 168) +
-      '<div class="qr-bank"><b>' + esc(s.bankName || s.bankBin || "Ngân hàng") + " · " + esc(s.bankAccount || "") + "</b>" +
+      '<div class="qr-bank"><b>' + esc(bName) + " · " + esc(s.bankAccount || "") + "</b>" +
       "<div>" + esc(s.accountName || s.bankHolder || "") + "</div>" +
       '<div class="strong num text-primary" style="font-size:15px;margin-top:4px">' + (lockAmt ? "" : "Cần thanh toán: ") + U.money(o.amount || 0) + "</div>" +
       (!lockAmt && (o.amount || 0) > 0

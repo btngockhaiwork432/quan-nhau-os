@@ -57,9 +57,9 @@
   /* =====================================================================
      NHAN, DANH MUC LUA CHON
      ===================================================================== */
-  const BANKS = [
+  const BANKS = U.BANKS || [
     { bin: "970436", name: "Vietcombank" }, { bin: "970415", name: "VietinBank" }, { bin: "970418", name: "BIDV" },
-    { bin: "970407", name: "Techcombank" }, { bin: "970422", name: "MB" }, { bin: "970416", name: "ACB" },
+    { bin: "970407", name: "Techcombank" }, { bin: "970422", name: "MBBank" }, { bin: "970416", name: "ACB" },
     { bin: "970432", name: "VPBank" }, { bin: "970423", name: "TPBank" }, { bin: "970405", name: "Agribank" }, { bin: "970403", name: "Sacombank" },
   ];
   const KIND_LABEL = { dish: "Món bếp", seafood: "Hải sản cân ký", beer: "Bia", drink: "Nước - rượu" };
@@ -88,9 +88,7 @@
     approveNoShowUnder: ["Tự xử lý cọc bàn khách không đến dưới", "money"],
     pettyCashMax: ["Chi tiền lẻ tối đa mỗi lần", "money"],
     voidBeforeSend: ["Xóa món trước khi gửi bếp", "bool"],
-    requestPrebill: ["Yêu cầu in tạm tính", "bool"],
-    collectPayment: ["Phục vụ ấn thanh toán nhanh tại bàn (hiện mã QR)", "bool"],
-    collectCash: ["Phục vụ thu tiền mặt trực tiếp tại bàn", "bool"],
+    requestPrebill: ["Bấm Thanh toán (chuyển in bill trực tiếp tại quầy thu ngân)", "bool"],
     createBottleKeep: ["Tạo phiếu rượu gửi", "bool"],
     viewTableTotal: ["Xem tổng tiền của bàn", "bool"],
     giveBrandPromo: ["Tặng bia khuyến mãi của hãng", "bool"],
@@ -119,7 +117,7 @@
     { id: "inventory", label: "Kho và khóa sổ", icon: "boxes", desc: "Dung sai kiểm kho và các chốt khóa tự động chống sửa số liệu.", keys: ["inventory", "locks"] },
     { id: "shifts", label: "Ca làm và lương", icon: "clock", desc: "Ca làm, quy định chấm công, đi trễ, tăng ca và cách tính lương.", keys: ["shifts", "attendance", "payroll"] },
     { id: "staff", label: "Nhân viên và phân quyền", icon: "users", desc: "Tài khoản nhân viên, quyền thao tác theo vai trò và thẻ số liệu từng màn hình.", keys: ["roles", "permissions", "widgets"] },
-    { id: "printers", label: "Máy in và mẫu bill", icon: "printer", desc: "Máy in, định tuyến phiếu bếp, cổng thanh toán QR Webhook, thông tin quán và mẫu bill K80.", keys: ["printers", "scale", "store", "paymentGateway", "receipt", "theme"] },
+    { id: "printers", label: "Máy in, VietQR & Bill", icon: "printer", desc: "Tài khoản VietQR, kết nối cổng thanh toán SePay/Casso/PayOS, máy in LAN và mẫu bill K80.", keys: ["printers", "scale", "store", "paymentGateway", "receipt", "theme"] },
     { id: "tax", label: "Thuế và kế toán", icon: "landmark", desc: "Thuế suất GTGT, thuế khoán hộ kinh doanh, chế độ kế toán và hóa đơn điện tử.", keys: ["tax"] },
   ];
   const GROUP_OF = {};
@@ -300,26 +298,35 @@
     },
     {
       id: "bank", group: "printers", title: "Tài khoản nhận VietQR", desc: "Mã QR thanh toán giữ cố định nội dung mã bàn và mở tự do ô số tiền để khách có thể cộng thêm Tiền Tip.",
+      keywords: "ngân hàng vietqr số tài khoản sepay casso va virtual account chuyển khoản qr",
       fields: [
-        f("store.bankBin", "select", "Ngân hàng", "Ngân hàng nhận tiền chuyển khoản của khách.", { options: BANKS.map((b) => ({ value: b.bin, label: b.name + " (" + b.bin + ")" })) }),
-        f("store.bankAccount", "text", "Số tài khoản", "Chỉ gồm chữ số, 6 đến 19 số.", { required: true, inputmode: "numeric" }),
+        f("store.bankBin", "select", "Ngân hàng nhận tiền", "Hỗ trợ đầy đủ 36 ngân hàng NAPAS 247 tại Việt Nam (MBBank, BIDV, Vietcombank, VietinBank, ACB, OCB, KienlongBank, VPBank...).", { options: BANKS.map((b) => ({ value: b.bin, label: b.name + " (" + b.bin + ")" })) }),
+        f("store.bankAccount", "text", "Số tài khoản (hoặc Số TK định danh VA)", "Nhập số tài khoản ngân hàng (6–19 chữ số) hoặc mã tài khoản định danh Virtual Account trên SePay/Casso (VD: VQR..., 96247..., LOCPHAT...).", { required: true }),
         f("store.accountName", "text", "Tên chủ tài khoản", "Viết in hoa không dấu, đúng như đăng ký với ngân hàng.", { required: true }),
       ],
       side: (d) => qrPreview(d),
     },
     {
-      id: "paymentGateway", group: "printers", title: "Cổng thanh toán & Webhook Biến động số dư", desc: "Tự động định danh mã nội dung QR (VD: QN A02 1234), báo thanh toán thành công khi tiền về >= số tiền cần thu và tự tách tiền Tip.",
+      id: "paymentGateway", group: "printers", title: "Cổng thanh toán & Webhook Biến động số dư (SePay / Casso / PayOS)", desc: "Kết nối trực tiếp trên giao diện web: tự động khớp mã nội dung QR (VD: QN A02 1234), chốt bill + tự in hóa đơn K80 khi tiền về >= mức thanh toán và tự tách Tiền Tip.",
+      keywords: "cổng thanh toán webhook biến động số dư sepay casso payos api key secret token xác minh tiền về",
       fields: [
-        f("paymentGateway.enabled", "bool", "Kích hoạt Webhook tự động xác nhận thanh toán QR", "Khi cổng thanh toán báo biến động số dư khớp mã nội dung bill, hệ thống tự động chốt bill và báo thành công."),
-        f("paymentGateway.provider", "select", "Cổng thanh toán liên kết", "Đơn vị cung cấp API biến động số dư ngân hàng.", {
-          options: ["SePay / Casso / VietQR", "PayOS", "VietQR Pro", "Casso Webhook", "SePay Webhook"].map((x) => ({ value: x, label: x })),
+        f("paymentGateway.enabled", "bool", "Kích hoạt Webhook tự động xác nhận thanh toán QR", "Khi cổng thanh toán báo biến động số dư khớp mã nội dung bill, hệ thống tự động chốt bill, đẩy lệnh in K80 và báo thành công trên mọi màn hình."),
+        f("paymentGateway.provider", "select", "Cổng thanh toán liên kết", "Tương thích chuẩn JSON & chữ ký bảo mật của cả SePay, Casso (V1/V2) và PayOS.", {
+          options: [
+            { value: "SePay Webhook", label: "SePay (my.sepay.vn — Khuyên dùng cho quán nhậu)" },
+            { value: "Casso Webhook", label: "Casso (casso.vn — Hỗ trợ V1 Secure-Token & V2 HMAC)" },
+            { value: "PayOS", label: "PayOS (my.payos.vn — Cổng thanh toán VietQR Pro)" },
+            { value: "SePay / Casso / VietQR", label: "Tự động nhận diện đa cổng (SePay / Casso / PayOS)" },
+          ],
         }),
         f("paymentGateway.prefix", "text", "Tiền tố mã định danh nội dung chuyển khoản", "Hệ thống tự sinh mã theo cấu trúc: <Tiền tố> <Mã bàn> <4 ký tự> (VD: QN A02 8491).", { required: true, maxlength: 8 }),
-        f("paymentGateway.webhookPath", "text", "Đường dẫn API nhận Webhook (Endpoint)", "Cấu hình URL này trên cổng thanh toán để đẩy biến động số dư về hệ thống."),
-        f("paymentGateway.webhookSecret", "text", "Khóa bảo mật Webhook (API Key / Secret Token)", "Nhập chuỗi khóa bí mật khớp với SePay/Casso (Header Authorization hoặc X-Webhook-Secret) để chặn giả mạo gói tin. Để trống nếu chưa bật."),
-        f("paymentGateway.autoCloseOnFullPay", "bool", "Tự động đóng bill khi số tiền nhận >= mức thanh toán", "Không bắt buộc khách chuyển đúng số tiền lẻ; chỉ cần >= số tiền cần thu là hệ thống báo thành công."),
+        f("paymentGateway.webhookPath", "text", "Đường dẫn API nhận Webhook (Endpoint)", "Mặc định giữ nguyên /api/webhooks/payment và sao chép URL đầy đủ ở khung bên phải."),
+        f("paymentGateway.webhookSecret", "text", "Khóa bảo mật Webhook (API Key / Secret Token)", "Điền cùng một mã này vào SePay (API Key) hoặc Casso (Secure-Token / Secret Key) để xác thực gói tin ngân hàng thật. Bấm Tạo mã ngẫu nhiên ở khung bên phải nếu chưa có."),
+        f("paymentGateway.autoCloseOnFullPay", "bool", "Tự động đóng bill & in hóa đơn K80 khi tiền về >= mức thanh toán", "Không bắt buộc khách chuyển đúng số lẻ; chỉ cần >= số tiền cần thu là hệ thống tự chốt bill và nhả hóa đơn K80 tại quầy."),
         f("paymentGateway.overpayAsTip", "bool", "Tự động ghi nhận phần tiền chuyển dư làm Tiền Tip", "Phần chênh lệch (Thực nhận - Cần thu > 0) tự động hạch toán vào Tiền Tip theo quy chế chia Tip."),
       ],
+      side: (d) => gatewayHelperCard(d),
+      example: () => gatewayRecentLogsHtml(),
     },
     {
       id: "receipt", group: "printers", title: "Mẫu bill K80", desc: "Xem trước trực tiếp ở khung bên phải.",
@@ -546,7 +553,7 @@
     });
     // Rang buoc rieng
     if (validTime(d.booking.slotStart) && validTime(d.booking.slotEnd) && U.minutesOf(d.booking.slotEnd) <= U.minutesOf(d.booking.slotStart)) put("booking.slotEnd", "Giờ kết thúc phải sau giờ bắt đầu nhận đặt bàn.");
-    if (d.store.bankAccount && !/^\d{6,19}$/.test(String(d.store.bankAccount).trim())) put("store.bankAccount", "Số tài khoản chỉ gồm chữ số, từ 6 đến 19 số. Hãy bỏ dấu cách hoặc ký tự khác.");
+    if (d.store.bankAccount && !/^[A-Za-z0-9]{4,24}$/.test(String(d.store.bankAccount).trim())) put("store.bankAccount", "Số tài khoản (hoặc mã VA) gồm chữ cái không dấu và chữ số, từ 4 đến 24 ký tự, không chứa dấu cách.");
     if (d.store.accountName && !/^[A-Z0-9 ]+$/.test(String(d.store.accountName).trim())) put("store.accountName", "Viết in hoa không dấu, ví dụ NGUYEN VAN HUNG.");
     if (d.store.taxCode && !/^\d{10}(-\d{3})?$/.test(String(d.store.taxCode).trim())) put("store.taxCode", "Mã số thuế gồm 10 số, hoặc 13 số dạng 0312345678-001.");
     if (d.store.phone && !/^[0-9 .+]{8,15}$/.test(String(d.store.phone).trim())) put("store.phone", "Số điện thoại không hợp lệ. Chỉ gồm chữ số, từ 8 đến 15 ký tự.");
@@ -1118,7 +1125,7 @@
       return "<tr>" +
         "<td>" + inp(k + ".name", "text", { cls: "input-sm", aria: "Tên máy in" }) + "</td>" +
         "<td>" + inp(k + ".location", "text", { cls: "input-sm", aria: "Vị trí đặt" }) + "</td>" +
-        '<td style="width:140px">' + inp(k + ".ip", "text", { cls: "input-sm", aria: "IP LAN máy in", placeholder: "192.168.1.201" }) + "</td>" +
+        '<td style="width:155px">' + inp(k + ".ip", "text", { cls: "input-sm", aria: "IP Wi-Fi/LAN hoặc USB", placeholder: "USB, AUTO hoặc IP" }) + "</td>" +
         '<td style="width:82px">' + inp(k + ".port", "int", { cls: "input-sm", aria: "Cổng TCP" }) + "</td>" +
         '<td style="width:135px">' + sel(k + ".purpose", opts(PURPOSE), { cls: "input-sm", aria: "Công dụng" }) + "</td>" +
         '<td style="width:80px">' + inp(k + ".copies", "int", { cls: "input-sm", aria: "Số liên" }) + "</td>" +
@@ -1129,14 +1136,14 @@
     const guide =
       '<div class="banner banner-info mb-12">' +
       I("printer") +
-      '<div><b>Mô hình chuẩn 1 Laptop tại quầy + 2 Máy in bill (1 Thu ngân, 1 Bếp):</b> Bấm nút <b>Thiết lập nhanh: 2 máy in (1 Thu ngân + 1 Bếp)</b> ở bảng Định tuyến bên dưới để tự gộp mọi món ăn &amp; tem hải sản về <b>Máy in Bếp</b>, còn hóa đơn &amp; phiếu bia/nước về <b>Máy in Thu ngân</b>. Điền <b>IP LAN</b> (cổng <code>9100</code>) của máy in rồi tải và mở <code>CAI_TU_KHOI_DONG_CUNG_WINDOWS.bat</code> trên chiếc Laptop tại quán là Bếp tự động nhả phiếu 100%.</div>' +
+      '<div><b>Mô hình chuẩn 1 Laptop tại quầy + 2 Máy in bill (1 Thu ngân USB, 1 Bếp Wi-Fi/LAN):</b> Bấm nút <b>Thiết lập nhanh: 2 máy in (1 Thu ngân + 1 Bếp)</b> bên dưới. Với <b>Máy in Thu ngân cắm USB</b>, điền chữ <code>USB</code>; với <b>Máy in Bếp Wi-Fi/LAN</b>, điền IP (VD <code>192.168.1.201</code>) hoặc chữ <code>AUTO</code>. Bộ kết nối trên Laptop có sẵn cơ chế <b>tự động khôi phục khi rớt mạng</b> (tự in bù phiếu chờ trong 30 phút không bị trùng) và <b>tự tìm lại IP mới theo mã MAC</b> nếu Router đổi IP máy in!</div>' +
       "</div>";
     return cardShell(CARD.printers,
-      guide + '<div class="table-wrap set-list"><table class="dt"><thead><tr><th>Tên máy in</th><th>Vị trí</th><th>IP LAN</th><th>Cổng</th><th>Công dụng</th><th>Số liên</th><th>Máy dự phòng</th><th class="center">Kết nối</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>",
+      guide + '<div class="table-wrap set-list"><table class="dt"><thead><tr><th>Tên máy in</th><th>Vị trí</th><th>IP Wi-Fi/LAN / USB</th><th>Cổng</th><th>Công dụng</th><th>Số liên</th><th>Máy dự phòng</th><th class="center">Kết nối</th><th></th></tr></thead><tbody>' + rows + "</tbody></table></div>",
       {
         errs: errsUnder("printers"),
         head:
-          '<a class="btn btn-sm" href="/api/print-agent/download" download="QuanNhau_MayIn_LAN.zip">' + I("download", "ic-sm") + " Tải bộ kết nối máy in LAN (.zip)</a>" +
+          '<a class="btn btn-sm" href="/api/print-agent/download" download="QuanNhau_MayIn_LAN.zip">' + I("download", "ic-sm") + " Tải bộ kết nối máy in USB & Wi-Fi/LAN (.zip)</a>" +
           UI.btn("Thêm máy in", { act: "settings.printerAdd", icon: "plus", size: "sm" }),
       }
     );
@@ -1172,6 +1179,91 @@
       '<div class="qr-bank"><b>' + esc(bank ? bank.name : s.bankBin) + " · " + esc(s.bankAccount || "") + "</b><div>" + esc(s.accountName || "") + "</div>" +
       '<div class="small text-success mt-4">' + (lockAmt ? "Đang khóa cứng số tiền: 500.000 đ" : "Ô số tiền mở tự do (khách nhập >= bill để cộng Tip)") + "</div>" +
       '<div class="muted small">Nội dung cố định: <b>QN A01 DEMO</b></div></div></div>';
+  }
+
+  function gatewayHelperCard(d) {
+    const pg = (d && d.paymentGateway) || {};
+    const savedPg = (Store.config && Store.config.paymentGateway) || {};
+    const origin = (typeof location !== "undefined" && /^https?:/.test(location.protocol)) ? location.origin : "https://munbao.com";
+    const path = String(pg.webhookPath || "/api/webhooks/payment").trim();
+    const fullUrl = origin + (path.startsWith("/") ? path : "/" + path);
+    const secret = String(pg.webhookSecret || "").trim();
+    const unsaved = !same(pg, savedPg);
+    const prov = String(pg.provider || "");
+    const st = S();
+
+    let guideSteps = "";
+    if (prov.indexOf("Casso") >= 0 && prov.indexOf("SePay") < 0) {
+      guideSteps =
+        "<div><b>1.</b> Mở <code>casso.vn</code> &rarr; Liên kết tài khoản ngân hàng nhận VietQR ở trên.</div>" +
+        "<div><b>2.</b> Vào <b>Thiết lập &rarr; Webhook &rarr; Thêm Webhook</b>, dán <b>Webhook URL</b> bên trên.</div>" +
+        "<div><b>3.</b> Dán <b>Khóa bảo mật</b> vào ô <code>Secure-Token</code> (V1) hoặc <code>Secret Key</code> (V2) rồi bấm Lưu &amp; Test.</div>";
+    } else if (prov.indexOf("PayOS") >= 0) {
+      guideSteps =
+        "<div><b>1.</b> Mở <code>my.payos.vn</code> &rarr; Tạo kênh thanh toán kết nối tài khoản ngân hàng của quán.</div>" +
+        "<div><b>2.</b> Dán <b>Webhook URL</b> bên trên vào ô Webhook (hệ thống tự phản hồi <code>200 OK</code> để PayOS xác thực ngay).</div>" +
+        "<div><b>3.</b> Copy <code>Checksum Key</code> từ PayOS dán ngược vào ô <b>Khóa bảo mật Webhook</b> bên trái rồi bấm Lưu.</div>";
+    } else {
+      guideSteps =
+        "<div><b>1.</b> Đăng nhập <code>my.sepay.vn</code> &rarr; <b>Ngân hàng</b> &rarr; Liên kết đúng STK VietQR của quán.</div>" +
+        "<div><b>2.</b> Vào <b>Tích hợp Webhooks &rarr; Thêm Webhook</b>: dán <b>Webhook URL</b> bên trên, chọn sự kiện <b>Có tiền vào</b>, Là Webhooks xác thực thanh toán: <b>Đúng / Bỏ qua nếu không có mã</b> = <b>Không</b> (hoặc gửi mọi giao dịch).</div>" +
+        "<div><b>3.</b> Kiểu chứng thực chọn <b>API Key</b> &rarr; điền cùng <b>Khóa bảo mật</b> bên dưới (tự khớp Header <code>Authorization: Apikey ...</code>) &rarr; Lưu!</div>";
+    }
+
+    const pingRes = st._gwPingResult;
+    return (
+      '<div class="set-preview-card col gap-8">' +
+        '<div class="row between"><span class="strong small">' + I("zap", "ic-sm") + ' Thông số nối cổng (Copy 1 chạm)</span>' +
+          (pg.enabled !== false ? UI.badge("Đang bật", "success") : UI.badge("Đang tắt", "danger")) +
+        "</div>" +
+        '<div class="small muted">1. Địa chỉ <b>Webhook URL</b> dán lên SePay / Casso / PayOS:</div>' +
+        '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;word-break:break-all"><code class="small strong">' + esc(fullUrl) + "</code></div>" +
+        '<div class="row gap-6 wrap">' +
+          UI.btn("Sao chép Webhook URL", { size: "sm", kind: "primary", icon: "clipboard-check", act: "settings.copyText", data: { text: fullUrl, label: "Webhook URL" } }) +
+        "</div>" +
+        '<div class="small muted mt-4">2. <b>Khóa bảo mật (API Key / Secret)</b>:</div>' +
+        '<div class="row gap-6 wrap">' +
+          UI.btn("Tạo khóa ngẫu nhiên", { size: "sm", icon: "key", act: "settings.genWebhookSecret" }) +
+          (secret ? UI.btn("Sao chép Khóa", { size: "sm", icon: "clipboard-check", act: "settings.copyText", data: { text: secret, label: "Khóa bảo mật Webhook" } }) : "") +
+        "</div>" +
+        (unsaved
+          ? '<div class="small text-warning"><b>Lưu ý:</b> Bạn vừa thay đổi cấu hình Webhook ở bản nháp — hãy bấm <b>Lưu và áp dụng</b> ở thanh dưới cùng trước khi bấm Kiểm tra kết nối!</div>'
+          : "") +
+        '<div class="mt-4">' +
+          UI.btn("Kiểm tra kết nối Webhook trực tiếp", { size: "sm", kind: unsaved ? "default" : "primary", icon: "refresh-cw", block: true, act: "settings.testGatewayPing" }) +
+        "</div>" +
+        (pingRes
+          ? '<div class="small ' + (pingRes.ok ? "text-success" : "text-danger") + '" style="padding:6px 8px;background:var(--surface-2);border-radius:6px">' + esc(pingRes.msg) + "</div>"
+          : "") +
+        '<div class="r-sep" style="margin:4px 0"></div>' +
+        '<div class="small strong">Hướng dẫn nối nhanh 3 bước:</div>' +
+        '<div class="small muted col gap-4">' + guideSteps + "</div>" +
+      "</div>"
+    );
+  }
+
+  function gatewayRecentLogsHtml() {
+    const logs = ((Store.data && Store.data.webhookLogs) || []).slice(0, 5);
+    const headRow = '<div class="row between wrap gap-8 mb-6"><b>Nhật ký tín hiệu Webhook ngân hàng nhận gần nhất (' + ((Store.data && Store.data.webhookLogs) || []).length + ' giao dịch)</b>' +
+      UI.btn("Làm mới nhật ký", { size: "sm", icon: "refresh-cw", act: "settings.refreshWebhookLogs" }) +
+      "</div>";
+    if (!logs.length) {
+      return headRow + '<div class="small muted">Chưa có gói tin biến động số dư nào. Bạn có thể bấm nút <b>Kiểm tra kết nối Webhook trực tiếp</b> ở khung bên phải hoặc quét thử 1 mã VietQR thật để kiểm chứng ngay lập tức!</div>';
+    }
+    const items = logs.map((w) => {
+      const stLabel =
+        w.status === "matched_paid" ? '<span class="text-success strong">Đã khớp &amp; Chốt bill ' + esc(w.tableCode || "") + "</span>" :
+        w.status === "partial_paid" ? '<span class="text-warning strong">Thu 1 phần bàn ' + esc(w.tableCode || "") + "</span>" :
+        w.status === "matched_booking_deposit" ? '<span class="text-success strong">Đã nhận cọc đặt bàn</span>' :
+        w.status === "ping_ok" ? '<span class="text-success strong">Kiểm tra kết nối OK</span>' :
+        w.status === "overpaid_closed_bill" ? '<span class="text-danger strong">Chuyển trùng sau đóng bill</span>' :
+        '<span class="muted">Giao dịch lẻ (không khớp mã bàn)</span>';
+      return '<div class="row between wrap gap-8 py-4 border-b small">' +
+        '<div><b>' + U.dateTime(w.at) + '</b> · <span class="muted">' + esc(w.gateway || "Webhook") + '</span> · <code>' + esc(w.content || w.payCode || "-") + "</code></div>" +
+        '<div>' + (w.amount > 0 ? '<b class="num">' + U.money(w.amount) + "</b> · " : "") + stLabel + "</div>" +
+      "</div>";
+    }).join("");
+    return headRow + '<div class="col">' + items + "</div>";
   }
 
   function billPreview(d) {
@@ -1481,7 +1573,12 @@
   document.addEventListener("change", (ev) => {
     const el = ev.target.closest("[data-set]");
     if (!el) return;
-    U.set(draft(), el.dataset.set, parseSetVal(el));
+    const val = parseSetVal(el);
+    U.set(draft(), el.dataset.set, val);
+    if (el.dataset.set === "store.bankBin") {
+      const bName = U.bankName ? U.bankName(val) : "";
+      if (bName) U.set(draft(), "store.bankName", bName);
+    }
     App.render();
   });
 
@@ -1888,6 +1985,7 @@
         if (cashierPr && p.id === cashierPr.id) {
           p.online = true;
           p.backupId = mainKitchen.id;
+          if (!String(p.ip || "").trim()) p.ip = "USB";
         } else if (p.id === mainKitchen.id) {
           p.online = true;
           p.categories = foodCats.slice();
@@ -1902,7 +2000,7 @@
           p.backupId = mainKitchen.id;
         }
       });
-      App.toast("Đã cấu hình chuẩn 2 máy in: 1 Máy Thu ngân (in Bill + Bia/Nước) + 1 Máy Bếp (in mọi món ăn & hải sản). Bấm Lưu và áp dụng!", "success");
+      App.toast("Đã cấu hình chuẩn 2 máy in: 1 Máy Thu ngân (USB) + 1 Máy Bếp (Wi-Fi/LAN). Điền IP Máy Bếp rồi bấm Lưu!", "success");
       App.render();
     },
     "settings.routeToggle": (d, el) => {
@@ -1915,6 +2013,72 @@
     },
     "settings.previewKind": (d) => {
       S().preview = d.value;
+      App.render();
+    },
+    "settings.copyText": async (d) => {
+      const txt = String((d && d.text) || "");
+      if (!txt) return;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(txt);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = txt;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        }
+        App.toast("Đã sao chép " + ((d && d.label) || "nội dung") + ": " + txt, "success");
+      } catch (e) {
+        App.toast("Không thể sao chép tự động, hãy bôi đen và Ctrl+C.", "warning");
+      }
+    },
+    "settings.genWebhookSecret": () => {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+      let tok = "qnos_";
+      for (let i = 0; i < 24; i++) tok += chars.charAt(Math.floor(Math.random() * chars.length));
+      U.set(draft(), "paymentGateway.webhookSecret", tok);
+      App.toast("Đã tạo Khóa bảo mật Webhook mới. Hãy bấm Lưu và áp dụng rồi copy dán sang SePay/Casso!", "info");
+      App.render();
+    },
+    "settings.testGatewayPing": async () => {
+      const d = draft();
+      const savedPg = (Store.config && Store.config.paymentGateway) || {};
+      if (!same(d.paymentGateway, savedPg)) {
+        App.toast("Bạn vừa sửa cấu hình Cổng thanh toán — hãy bấm 'Lưu và áp dụng' ở dưới cùng trước khi kiểm tra kết nối!", "warning");
+        return;
+      }
+      const sec = String(savedPg.webhookSecret || "").trim();
+      const headers = { "Content-Type": "application/json" };
+      if (sec) headers["Authorization"] = "Apikey " + sec;
+      try {
+        const resp = await fetch((Store.apiBase || "") + "/api/webhooks/payment/test", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ gateway: savedPg.provider || "Kiểm tra trực tiếp Web UI" }),
+        });
+        const out = await resp.json().catch(() => ({}));
+        if (resp.ok && out && out.ok) {
+          if (Store.syncFromPostgres) await Store.syncFromPostgres(false);
+          S()._gwPingResult = {
+            ok: true,
+            msg: "Kết nối chuẩn 100% (HTTP 200 OK) · " + (out.secretVerified ? "Đã xác thực Khóa bảo mật API Key" : "Chế độ mở (chưa đặt khóa)") + " · Đã lưu PostgreSQL lúc " + U.time(Date.now()),
+          };
+          App.toast("Kiểm tra kết nối Webhook thành công! Sẵn sàng nhận biến động số dư từ cổng thanh toán.", "success");
+        } else {
+          S()._gwPingResult = { ok: false, msg: "Lỗi phản hồi HTTP " + resp.status + ": " + ((out && out.detail) || "Không xác thực được") };
+          App.toast(S()._gwPingResult.msg, "error");
+        }
+      } catch (e) {
+        S()._gwPingResult = { ok: false, msg: "Không kết nối được máy chủ: " + e.message };
+        App.toast(S()._gwPingResult.msg, "error");
+      }
+      App.render();
+    },
+    "settings.refreshWebhookLogs": async () => {
+      if (Store.syncFromPostgres) await Store.syncFromPostgres(false);
+      App.toast("Đã làm mới nhật ký tín hiệu Webhook từ máy chủ PostgreSQL", "info");
       App.render();
     },
   });

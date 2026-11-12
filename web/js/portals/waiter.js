@@ -69,7 +69,7 @@
     const status = Engine.tableStatus(table);
     const pend = st.pendingSend && st.pendingSend.ticketId === tk.id ? st.pendingSend.items : [];
     const canTotal = Engine.can(me.role, "viewTableTotal");
-    const canPay = Engine.can(me.role, "collectPayment") !== false;
+    const canPrintBill = Engine.can(me.role, "requestPrebill") !== false;
     const waiterName = Engine.staffName(tk.waiterId || me.id);
     const items = tk.items.slice().reverse();
     const hasPaidBeer = tk.items.some((i) => !i.isFree && i.status !== "void" && (Engine.menu(i.menuId) || {}).kind === "beer");
@@ -80,8 +80,7 @@
       if (it.status === "void") badge = UI.badge("Đã hủy", "");
       else if (it.status === "pending_weigh") badge = UI.badge("Chờ cân", "warning");
       else if (it.voidRequested) badge = UI.badge("Chờ duyệt hủy", "danger");
-      else if (it.status === "sent") badge = '<button class="btn btn-sm" data-act="waiter.served" data-item="' + it.id + '">Đã bưng</button>';
-      else if (it.status === "served") badge = UI.badge("Đã ra", "success");
+      else if (it.status === "sent" || it.status === "served") badge = UI.badge(m && (m.kind === "beer" || m.kind === "drink") ? "Đã xuất quầy" : "Đã in bếp", "success");
       const retBtn = isPaidBeer
         ? '<button type="button" class="btn btn-sm" style="border-color:var(--warning);color:var(--warning)" data-act="waiter.returnBeerModal" data-item="' + it.id + '" data-menu="' + it.menuId + '">Trả bia dư</button>'
         : "";
@@ -100,9 +99,8 @@
       (tot.vip ? '<div class="mt-8">' + (tot.vip.waived ? UI.badge("Đã đạt mức chi tối thiểu - miễn phụ thu VIP", "success") : UI.badge("Phụ thu VIP " + U.money(tot.vip.fee) + " · còn " + U.moneyShort(tot.vip.remainingToMin) + " để được miễn", "violet")) + "</div>" : "") +
       (tk.deposit ? '<div class="mt-8">' + UI.badge("Đã cọc " + U.money(tk.deposit), "success") + "</div>" : "") +
       "</div>" +
-      (tk.status === "locked" ? UI.banner("danger", "lock", "<b>Bill đã khóa</b> sau khi in tạm tính lúc " + U.time(tk.prebillAt) + ". Muốn gọi thêm, báo thu ngân gửi yêu cầu mở khóa.") : "") +
-      (tk.prebillOutdated ? UI.banner("warning", "triangle-alert", "<b>Phiếu tạm tính cũ đã hết hiệu lực</b> (" + esc(tk.prebillInvalidatedReason || "Đã chỉnh sửa trả bia dư") + "). Vui lòng báo Thu ngân <b>In lại tạm tính</b> trước khi gửi khách.") : "") +
-      (tk.prebillRequestedAt && tk.status !== "locked" ? UI.banner("info", "receipt-text", "Đã báo thu ngân in tạm tính lúc " + U.time(tk.prebillRequestedAt) + ".") : "") +
+      (tk.status === "locked" ? UI.banner("info", "printer", "<b>Đã chuyển in bill tại quầy thu ngân</b> lúc " + U.time(tk.prebillAt) + ". Bill đang khóa chờ thu ngân chốt thanh toán (muốn gọi thêm, báo thu ngân mở khóa).") : "") +
+      (tk.prebillOutdated ? UI.banner("warning", "triangle-alert", "<b>Bill in trước đó đã hết hiệu lực</b> (" + esc(tk.prebillInvalidatedReason || "Đã chỉnh sửa trả bia dư") + "). Bấm nút <b>Thanh toán</b> bên dưới để chuyển in lại bill mới tại quầy thu ngân.") : "") +
       '<div class="card"><div class="card-head"><div><h3>Món đã gọi</h3><span class="sub">' + tot.itemCount + " phần</span></div>" +
       (hasPaidBeer ? UI.btn("Trả bia dư (lon/chai)", { size: "sm", icon: "beer", act: "waiter.returnBeerModal" }) : "") +
       "</div><div class='card-body' style='padding-top:0;padding-bottom:0'>" +
@@ -111,7 +109,7 @@
       "</div></div>" +
       '<div class="sticky-action"><div class="row gap-8">' +
         UI.btn("Khác", { act: "waiter.more", icon: "ellipsis", size: "lg" }) +
-        (canPay && tot.itemCount > 0 ? UI.btn("Thanh toán", { act: "waiter.payModal", kind: "success", size: "lg", icon: "qr-code", cls: "grow", disabled: !!tot.pendingWeigh }) : "") +
+        (canPrintBill && tot.itemCount > 0 ? UI.btn("Thanh toán", { act: "waiter.printBillCounter", kind: "success", size: "lg", icon: "printer", cls: "grow", disabled: !!tot.pendingWeigh }) : "") +
         UI.btn("Thêm món", { act: "waiter.order", kind: "primary", size: "lg", icon: "plus", cls: "grow", disabled: tk.status === "locked" }) +
       "</div></div>";
   }
@@ -180,10 +178,9 @@
     Store.data.notifications.filter((n) => !n.read && n.type === "weighed" && (!n.waiterId || n.waiterId === me.id)).forEach((n) => out.push({ id: n.id, icon: "scale", tone: "success", title: n.text, meta: "Lúc " + U.time(n.at) + " · đã chuyển bếp", act: "waiter.readNote" }));
     Engine.openTickets().filter((t) => t.waiterId === me.id || !t.waiterId).forEach((t) => {
       const table = Engine.table(t.tableId);
-      t.items.filter((i) => i.status === "sent" && now - i.sentAt > cfg.floor.slowOrderMinutes * 60000).forEach((i) => out.push({ icon: "timer", tone: "danger", title: "Bàn " + table.code + ": " + i.name + " chờ lâu", meta: "Đã gửi " + U.duration(now - i.sentAt) + " - kiểm tra với bếp", table: t.tableId }));
       const tot = Engine.totals(t);
       if (tot.vip && !tot.vip.waived && tot.vip.nextHourIn <= cfg.floor.vipWarnMinutes) out.push({ icon: "hourglass", tone: "warning", title: table.code + " sắp sang giờ tiếp theo", meta: "Còn " + tot.vip.nextHourIn + " phút, phụ thu thêm " + U.money(cfg.vip.hourlyRate), table: t.tableId });
-      if (t.status === "locked") out.push({ icon: "lock", tone: "info", title: "Bàn " + table.code + " đã in tạm tính", meta: "Chờ khách thanh toán · " + U.money(tot.grand), table: t.tableId });
+      if (t.status === "locked") out.push({ icon: "printer", tone: "info", title: "Bàn " + table.code + " đã chuyển in bill tại quầy", meta: "Chờ thu ngân chốt thanh toán · " + U.money(tot.grand), table: t.tableId });
     });
     Engine.weighQueue().filter((q) => q.ticket.waiterId === me.id).forEach((q) => out.push({ icon: "fish", tone: "warning", title: "Bàn " + q.table.code + ": " + q.item.name + " đang chờ cân", meta: "Đã chờ " + U.clock(q.waitMs), table: q.ticket.tableId }));
     Object.keys(Store.data.tableState).forEach((tid) => out.push({ icon: "sparkles", tone: "", title: "Bàn " + Engine.table(tid).code + " cần dọn", meta: "Khách rời lúc " + U.time(Store.data.tableState[tid].since), clean: tid }));
@@ -191,7 +188,7 @@
   }
   function tasksView(me) {
     const list = tasks(me);
-    return "<h2 style='font-size:18px'>Việc cần làm</h2>" + (list.length ? '<div class="card list">' + list.map((t) => '<div class="list-row"><span class="badge badge-' + (t.tone || "") + '" style="width:32px;height:32px;padding:0;justify-content:center">' + I(t.icon, "ic-sm") + '</span><div class="grow"><div class="strong">' + esc(t.title) + '</div><div class="meta">' + esc(t.meta) + "</div></div>" + (t.act ? UI.btn("Đã xem", { size: "sm", act: t.act, data: { id: t.id } }) : t.clean ? UI.btn("Đã dọn", { size: "sm", act: "waiter.clean", data: { table: t.clean } }) : t.table ? UI.iconBtn("chevron-right", { act: "waiter.table", data: { table: t.table }, title: "Mở bàn" }) : "") + "</div>").join("") + "</div>" : UI.empty("circle-check", "Không có việc tồn đọng", "Món ra, hải sản đã cân và bàn cần dọn sẽ hiện ở đây."));
+    return "<h2 style='font-size:18px'>Việc cần làm</h2>" + (list.length ? '<div class="card list">' + list.map((t) => '<div class="list-row"><span class="badge badge-' + (t.tone || "") + '" style="width:32px;height:32px;padding:0;justify-content:center">' + I(t.icon, "ic-sm") + '</span><div class="grow"><div class="strong">' + esc(t.title) + '</div><div class="meta">' + esc(t.meta) + "</div></div>" + (t.act ? UI.btn("Đã xem", { size: "sm", act: t.act, data: { id: t.id } }) : t.clean ? UI.btn("Đã dọn", { size: "sm", act: "waiter.clean", data: { table: t.clean } }) : t.table ? UI.iconBtn("chevron-right", { act: "waiter.table", data: { table: t.table }, title: "Mở bàn" }) : "") + "</div>").join("") + "</div>" : UI.empty("circle-check", "Không có việc tồn đọng", "Thông báo khách chuyển khoản QR, hải sản đã cân và bàn cần dọn sẽ hiện ở đây."));
   }
 
   /* ---------- Tab Ca nhan ---------- */
@@ -212,7 +209,8 @@
       "</div></div>" +
       '<div class="card"><div class="card-head"><h3>Ca gần đây</h3><span class="sub">' + pay.days + " ngày công trong tháng</span></div>" +
       (recent.length ? '<div class="list">' + recent.map((r) => { const h = Engine.attHours(r); return '<div class="list-row"><div class="grow"><div class="strong">' + U.dayLabel(r.dayKey) + '</div><div class="meta">' + U.time(r.in) + " - " + (r.out ? U.time(r.out) : "đang làm") + (r.lateMin > Store.config.attendance.graceMinutes ? " · trễ " + r.lateMin + " phút" : "") + (r.otStatus === "pending" ? " · tăng ca chờ duyệt" : "") + '</div></div><span class="num strong">' + U.num(h.regular + h.ot, 1) + " giờ</span></div>"; }).join("") + "</div>" : UI.empty("calendar", "Chưa có ca nào trong tháng")) +
-      "</div>";
+      "</div>" +
+      '<div class="mt-8">' + UI.btn("Đăng xuất tài khoản khỏi thiết bị này", { act: "app.logout", icon: "log-out", block: true }) + "</div>";
   }
 
   /* ---------- Render ---------- */
@@ -461,7 +459,7 @@
     const st = S();
     App.modal({
       title: "Kiểm tra trước khi gửi bếp",
-      sub: "Bàn " + Engine.table(st.tableId).code + " · Tổng tạm tính: " + U.money(U.sum(st.cart, cartLineAmount)),
+      sub: () => "Bàn " + Engine.table(st.tableId).code + " · Tổng tạm tính: " + U.money(U.sum(st.cart, cartLineAmount)),
       sheet: true,
       body: () => (st.cart.length ? st.cart.map((c, i) => {
         const m = Engine.menu(c.menuId);
@@ -538,46 +536,6 @@
     App.render();
   }
 
-  function renderPaidSummaryHtml(sale) {
-    const need = Math.max(0, (sale.grand || 0) - (sale.deposit || 0));
-    const shares = Array.isArray(sale.tipShares) && sale.tipShares.length
-      ? sale.tipShares
-      : sale.tip > 0 && sale.tipStaffId
-      ? [{ staffId: sale.tipStaffId, amount: sale.tip }]
-      : [];
-    return (
-      '<div class="col gap-12">' +
-        '<div class="banner banner-success">' +
-          I("circle-check") +
-          '<div><b style="font-size:16px">THANH TOÁN THÀNH CÔNG — KHÔNG CẦN KIỂM TRA LẠI</b><br>Hệ thống đã tự động định danh mã <b>' + esc(sale.payCode || sale.tableCode) + "</b> và khóa sổ hóa đơn bàn <b>" + esc(sale.tableCode) + "</b>.</div>" +
-        "</div>" +
-        '<div class="card card-pad">' +
-          '<div class="tot-row"><span>Bàn / Mã định danh QR</span><span class="strong">' + esc(sale.tableCode) + " · " + esc(sale.payCode || "--") + "</span></div>" +
-          '<div class="tot-row"><span>Số tiền cần thanh toán</span><span class="num">' + U.money(need) + "</span></div>" +
-          '<div class="tot-row"><span>Số tiền thực nhận</span><span class="num strong text-primary">' + U.money(sale.received || need) + "</span></div>" +
-          (sale.change > 0 ? '<div class="tot-row"><span>Tiền thối lại khách</span><span class="num">' + U.money(sale.change) + "</span></div>" : "") +
-          (sale.tip > 0
-            ? '<div class="tot-row text-success"><span>Tiền Tip tự động xác định (' + esc(Engine.TIP_MODES[sale.tipMode] || "Cá nhân") + ')</span><span class="num strong">+' + U.money(sale.tip) + "</span></div>" +
-              '<div class="mt-8" style="padding:8px 10px;background:var(--surface-2);border-radius:8px">' +
-                '<div class="small strong mb-4">Phân bổ Tiền Tip vào lương / két trả mặt:</div>' +
-                shares.map((sh) => '<div class="row between small"><span>' + esc(Engine.staffName(sh.staffId)) + '</span><b class="text-success num">+' + U.money(sh.amount) + "</b></div>").join("") +
-              "</div>"
-            : "") +
-        "</div>" +
-      "</div>"
-    );
-  }
-
-  function showPaymentSuccessModal(sale) {
-    App.modal({
-      title: "Đã thanh toán bàn " + sale.tableCode,
-      sub: "Mã giao dịch: " + (sale.payCode || sale.id) + " · Lúc " + U.time(sale.closedAt || Date.now()),
-      sheet: true,
-      body: () => renderPaidSummaryHtml(sale),
-      foot: () => UI.btn("Hoàn tất · Về sơ đồ bàn", { act: "waiter.closeSuccessPay", kind: "primary", size: "lg", block: true, icon: "check" }),
-    });
-  }
-
   /* ---------- Hanh dong ---------- */
   App.actions({
     "waiter.tab": (d) => { const st = S(); st.tab = d.value; if (d.value === "tables" && st.view !== "order") st.view = st.tableId && Engine.ticketByTable(st.tableId) && st.view === "table" ? "table" : "floor"; App.render(); },
@@ -592,7 +550,7 @@
       st.tab = "tables";
       if (me && me.role === "waiter" && !Engine.activeAtt(me.id)) {
         App.toast("Bạn chưa chấm công vào ca. Vui lòng chấm công trước khi nhận bàn.", "warning");
-        checkinModal(me);
+        App.openCheckinModal();
         return;
       }
       if (status.ticket) { st.tableId = table.id; st.view = "table"; App.render(); return; }
@@ -619,7 +577,7 @@
       if (me && me.role === "waiter" && !Engine.activeAtt(me.id)) {
         App.closeModal(true);
         App.toast("Bạn chưa chấm công vào ca. Vui lòng chấm công trước khi mở bàn.", "warning");
-        checkinModal(me);
+        App.openCheckinModal();
         return;
       }
       const ok = App.commit(() => Engine.openTable(d.table, { guests: st.guests, waiterId: me.id, bookingId: d.booking || null }), "Đã mở bàn " + Engine.table(d.table).code);
@@ -635,7 +593,7 @@
       const me = App.me();
       if (me && me.role === "waiter" && !Engine.activeAtt(me.id)) {
         App.toast("Bạn chưa chấm công vào ca. Vui lòng chấm công trước khi gọi món.", "warning");
-        checkinModal(me);
+        App.openCheckinModal();
         return;
       }
       const st = S();
@@ -875,9 +833,7 @@
         sheet: true,
         body: () => '<div class="card list">' +
           row("beer", "Trả lại bia dư (lon / chai chưa khui)", "Khách gọi nguyên thùng/két không uống hết, trừ lại trực tiếp trên bill", "waiter.returnBeerModal", !hasBeer) +
-          row("qr-code", "Thanh toán nhanh tại bàn", "Hiện mã VietQR định danh " + (tk ? Engine.ensurePayCode(tk) : "") + " hoặc thu tiền mặt", "waiter.payModal", !tk || !Engine.can(me.role, "collectPayment")) +
           row("user-pen", "Đổi người phụ trách bàn", "Bàn giao hoặc nhận đứng bàn " + Engine.table(st.tableId).code, "waiter.assignWaiterModal", !tk) +
-          row("receipt-text", "Yêu cầu in tạm tính", "Báo thu ngân in phiếu tạm tính cho khách kiểm tra", "waiter.prebill", tk.status === "locked" || !Engine.can(me.role, "requestPrebill")) +
           row("wine", "Tạo thẻ gửi rượu", "Khách gửi lại chai rượu chưa dùng hết", "waiter.bottle", !Engine.can(me.role, "createBottleKeep")) +
           row("arrow-right-left", "Chuyển bàn", "Chuyển toàn bộ bill sang bàn trống khác", "waiter.transfer", !Engine.can(me.role, "transferTable")) +
           row("ban", "Hủy món đã gửi", "Gửi yêu cầu hủy, cần Chủ quán duyệt", "waiter.void", tk.status === "locked") +
@@ -1082,280 +1038,32 @@
       App.commit(() => Engine.assignWaiterToTable(tk.tableId, d.staff, App.me().id), "Đã giao bàn " + Engine.table(tk.tableId).code + " cho " + Engine.staffName(d.staff));
       App.closeModal(true);
     },
-    "waiter.payModal": () => {
+    "waiter.printBillCounter": async () => {
       const st = S();
       const me = App.me();
       const tk = Engine.ticketByTable(st.tableId);
       if (!tk) return;
+      const table = Engine.table(tk.tableId);
       const tot = Engine.totals(tk);
-      if (tot.pendingWeigh) return App.toast("Bàn còn món hải sản chưa cân.", "error");
-      const payCode = Engine.ensurePayCode(tk);
-      const need = Math.max(0, tot.due !== undefined ? tot.due : tot.grand - tot.deposit - (tot.paid || 0));
-      const canCash = Engine.can(me.role, "collectCash") !== false;
-      const defaultTipMode = tk.preferredTipMode || (Store.config.payroll && Store.config.payroll.tipPolicy) || "personal";
-      st._pay = {
-        ticketId: tk.id,
-        tableId: tk.tableId,
-        method: "qr",
-        tipMode: defaultTipMode,
-        tipStaffId: tk.waiterId || me.id,
-        whAmount: need,
-        whContent: payCode,
-        cashReceived: need,
-        cashOverAsTip: false,
-      };
-      App.modal({
-        title: "Thanh toán tại bàn " + Engine.table(tk.tableId).code,
-        sub: "Mã định danh QR duy nhất: " + payCode + " · Cần thu: " + U.money(need),
-        size: "lg",
-        sheet: true,
-        body: () => {
-          const p = st._pay;
-          const curTk = Engine.ticket(p.ticketId);
-          if (!curTk || curTk.status === "paid") {
-            const paidSale = Store.data.sales.slice().reverse().find((s) => s.ticketId === p.ticketId);
-            if (paidSale) return renderPaidSummaryHtml(paidSale);
-            return UI.banner("success", "circle-check", "Hóa đơn đã được thanh toán thành công.");
-          }
-          const curTot = Engine.totals(curTk);
-          const curNeed = Math.max(0, curTot.due !== undefined ? curTot.due : curTot.grand - curTot.deposit - (curTot.paid || 0));
-          const pendingAps = Engine.pendingTicketApprovals ? Engine.pendingTicketApprovals(curTk.id) : [];
-          const simOver = Math.max(0, (Number(p.whAmount) || 0) - curNeed);
-          const simShares = simOver > 0 ? Engine.computeTipShares(curTk, simOver, p.tipMode, p.tipStaffId) : [];
-          const cashOver = Math.max(0, (Number(p.cashReceived) || 0) - curNeed);
-          const cashTip = p.cashOverAsTip ? cashOver : 0;
-          const cashChange = Math.max(0, cashOver - cashTip);
-          const cashShares = cashTip > 0 ? Engine.computeTipShares(curTk, cashTip, p.tipMode, p.tipStaffId) : [];
-
-          const partialBanner = curTot.paid > 0
-            ? '<div class="banner banner-warning mt-8">' +
-                I("coins") +
-                '<div><b>Đã thu 1 phần: ' + U.money(curTot.paid) + '</b> (' + (curTk.payments || []).length + ' lần giao dịch) &rarr; <b>Còn phải thu thêm: ' + U.money(curNeed) + '</b>. Mã VietQR bên dưới đã tự động cập nhật số tiền còn lại (khách có thể chuyển khoản tiếp hoặc trả nốt bằng tiền mặt).</div>' +
-              "</div>"
-            : "";
-
-          const pendingApBanner = pendingAps.length > 0
-            ? '<div class="banner banner-danger mt-8">' +
-                I("triangle-alert") +
-                '<div><b>Chú ý:</b> Bàn đang có <b>' + pendingAps.length + ' yêu cầu chờ duyệt</b> (' + pendingAps.map((a) => esc(a.title)).join("; ") + '). Nên chờ Quản lý ca / Chủ quán duyệt xong trước khi chốt thanh toán.</div>' +
-              "</div>"
-            : "";
-
-          const dutyWaiters = Engine.onDutyWaiters ? Engine.onDutyWaiters() : [];
-          const poolLabel = dutyWaiters.length
-            ? "Chia đều toàn ca phục vụ (" + dutyWaiters.length + " người trong ca)"
-            : "Chia đều toàn ca phục vụ (0 người trong ca → về người đứng bàn)";
-          const tipModeSelector =
-            '<div class="card card-pad mt-8" style="background:var(--surface-2)">' +
-              '<div class="small strong mb-4">' + I("hand-coins", "ic-sm") + " Quy chế xác định Tiền Tip (khi khách chuyển dư trên mức thanh toán):</div>" +
-              '<div class="chips chips-wrap">' +
-                '<button type="button" class="chip ' + (p.tipMode === "personal" ? "active" : "") + '" data-act="waiter.payTipMode" data-mode="personal">Nhân viên đứng bàn hưởng 100% (' + esc(Engine.staffName(p.tipStaffId)) + ")</button>" +
-                '<button type="button" class="chip ' + (p.tipMode === "pool" ? "active" : "") + '" data-act="waiter.payTipMode" data-mode="pool">' + esc(poolLabel) + "</button>" +
-                '<button type="button" class="chip ' + (p.tipMode === "area" ? "active" : "") + '" data-act="waiter.payTipMode" data-mode="area">Chia theo tổ khu vực bàn</button>' +
-              "</div>" +
-            "</div>";
-
-          const qrBody =
-            '<div class="col gap-12 mt-8">' +
-              UI.qrBox({
-                amount: curNeed,
-                memo: payCode,
-                size: 176,
-                caption: "Đưa khách quét VietQR — Nội dung cố định, số tiền nhập tự do (nhận Tip)",
-              }) +
-              '<div class="banner banner-info">' +
-                I("zap") +
-                '<div><b>Số tiền mở tự do + Nội dung cố định (' + esc(payCode) + '):</b> Khi khách quét mã trên App ngân hàng, nội dung <b>' + esc(payCode) + '</b> được điền cố định còn ô số tiền để mở tự do. Khách nhập <b>&gt;= ' + U.money(curNeed) + '</b> (ví dụ chuyển thêm Tiền Tip), hệ thống tự động xác nhận hoàn tất bill và cộng phần dư vào Tiền Tip!</div>' +
-              "</div>" +
-              (!App.isDemo()
-                ? '<div class="row gap-8 mt-4">' +
-                    UI.btn("Xác nhận khách đã chuyển khoản đủ (" + U.money(curNeed) + ")", { act: "waiter.confirmManualPay", kind: "primary", size: "lg", icon: "check", block: true }) +
-                  "</div>"
-                : "") +
-              '<div class="card card-pad demo-only" style="border:1.5px dashed var(--primary);background:var(--surface-2)">' +
-                '<div class="row between wrap gap-8 mb-8">' +
-                  '<div><div class="strong">' + I("webhook", "ic-sm") + ' Mô phỏng Cổng thanh toán báo Biến động số dư (API Webhook)</div><div class="small muted">Endpoint: <code>POST /api/webhooks/payment</code> · Nội dung định danh: <b>' + esc(payCode) + "</b></div></div>" +
-                  UI.badge("Tự động khớp < 1 giây", "success") +
-                "</div>" +
-                '<div class="small strong mb-4">Chọn nhanh số tiền khách chuyển khoản (Cần thu: ' + U.money(curNeed) + '):</div>' +
-                '<div class="chips mb-8">' +
-                  (curNeed >= 100000 ? [Math.round(curNeed / 2 / 1000) * 1000] : []).map((halfVal) =>
-                    '<button type="button" class="chip ' + (Number(p.whAmount) === halfVal ? "active" : "") + '" data-act="waiter.whPreset" data-v="' + halfVal + '">Chuyển 1 phần ' + U.money(halfVal) + "</button>"
-                  ).join("") +
-                  [0, 20000, 50000, 100000].map((tipAdd) => {
-                    const v = curNeed + tipAdd;
-                    return '<button type="button" class="chip ' + (Number(p.whAmount) === v ? "active" : "") + '" data-act="waiter.whPreset" data-v="' + v + '">' +
-                      (tipAdd === 0 ? "Đúng " + U.money(v) + " (Tip 0đ)" : "Chuyển " + U.money(v) + " (+" + U.moneyShort(tipAdd) + " Tip)") +
-                    "</button>";
-                  }).join("") +
-                "</div>" +
-                '<div class="grid-2 gap-8">' +
-                  UI.field("Số tiền biến động báo về (VNĐ)", UI.input({ id: "w-wh-amt", type: "number", step: 10000, model: "waiter._pay.whAmount", live: true, value: p.whAmount })) +
-                  UI.field("Nội dung chuyển khoản ngân hàng", UI.input({ id: "w-wh-content", model: "waiter._pay.whContent", live: true, value: p.whContent })) +
-                "</div>" +
-                (simOver > 0
-                  ? '<div class="banner banner-success mt-8">' +
-                      I("hand-coins") +
-                      '<div>Khách chuyển dư <b>+' + U.money(simOver) + '</b> trên mức cần thanh toán (' + U.money(curNeed) + ') &rarr; Hệ thống tự động ghi nhận <b>Tiền Tip ' + U.money(simOver) + '</b> (' + esc(Engine.TIP_MODES[p.tipMode]) + '): ' +
-                      simShares.map((sh) => "<b>" + esc(Engine.staffName(sh.staffId)) + ": +" + U.money(sh.amount) + "</b>").join(", ") +
-                      "</div></div>"
-                  : (Number(p.whAmount) || 0) < curNeed
-                  ? '<div class="small text-warning mt-4">Khách chuyển <b>' + U.money(Number(p.whAmount) || 0) + '</b> (&lt; ' + U.money(curNeed) + ') &rarr; Hệ thống sẽ ghi nhận <b>Đã thu 1 phần</b> và cập nhật số tiền còn thiếu <b>' + U.money(curNeed - (Number(p.whAmount) || 0)) + '</b>.</div>'
-                  : '<div class="small muted mt-4">Khách chuyển đúng bằng mức cần thanh toán (' + U.money(curNeed) + ').</div>') +
-                '<div class="row gap-8 mt-8 wrap">' +
-                  UI.btn("Giả lập Ngân hàng báo tiền về (Auto-Chốt)", { act: "waiter.simulateWebhookPay", kind: "primary", size: "lg", icon: "zap", cls: "grow" }) +
-                  UI.btn("Xác nhận thủ công", { act: "waiter.confirmManualPay", size: "lg", icon: "check" }) +
-                "</div>" +
-              "</div>" +
-            "</div>";
-
-          const cashBody =
-            '<div class="col gap-12 mt-8">' +
-              '<div class="card card-pad">' +
-                '<div class="small strong mb-4">Chọn nhanh mệnh giá tiền mặt khách đưa tại bàn (Cần thu: ' + U.money(curNeed) + '):</div>' +
-                '<div class="chips mb-8">' +
-                  [curNeed, curNeed + 20000, curNeed + 50000, Math.ceil(curNeed / 100000) * 100000, Math.ceil(curNeed / 500000) * 500000]
-                    .filter((v, i, a) => v >= curNeed && a.indexOf(v) === i)
-                    .map((v) => '<button type="button" class="chip ' + (Number(p.cashReceived) === v ? "active" : "") + '" data-act="waiter.cashPreset" data-v="' + v + '">' + U.money(v) + "</button>")
-                    .join("") +
-                "</div>" +
-                UI.field("Số tiền mặt khách đưa (VNĐ)", UI.input({ id: "w-cash-amt", type: "number", step: 10000, model: "waiter._pay.cashReceived", live: true, value: p.cashReceived })) +
-                (cashOver > 0
-                  ? '<div class="mt-8"><label class="check">' + UI.switchInput({ checked: p.cashOverAsTip, change: "waiter.cashTipToggle" }) + '<span><b>Khách bo luôn tiền thừa ' + U.money(cashOver) + ' làm Tiền Tip</b> (không cần thối lại)</span></label></div>'
-                  : "") +
-                '<div class="row between mt-12" style="padding:10px 12px;background:var(--surface-2);border-radius:8px">' +
-                  (cashTip > 0
-                    ? '<div><div class="small muted">Tiền Tip ghi nhận (' + esc(Engine.TIP_MODES[p.tipMode]) + ')</div><div class="strong text-success num">+' + U.money(cashTip) + " (" + cashShares.map((s) => esc(Engine.staffName(s.staffId)) + ": " + U.money(s.amount)).join(", ") + ")</div></div>"
-                    : '<div><div class="small muted">Tiền thối lại khách</div><div class="strong num" style="font-size:18px">' + U.money(cashChange) + "</div></div>") +
-                "</div>" +
-                '<div class="mt-12">' +
-                  UI.btn("Hoàn tất Thu Tiền mặt tại bàn (" + U.money(curNeed) + ")", { act: "waiter.confirmCashPay", kind: "primary", size: "lg", block: true, icon: "banknote", disabled: (Number(p.cashReceived) || 0) < curNeed }) +
-                "</div>" +
-              "</div>" +
-            "</div>";
-
-          return UI.totals(curTk) +
-            partialBanner +
-            pendingApBanner +
-            tipModeSelector +
-            (canCash
-              ? '<div class="mt-8">' + UI.seg([{ value: "qr", label: "Quét VietQR Định danh (" + payCode + ")" }, { value: "cash", label: "Thu Tiền mặt tại bàn" }], p.method, "waiter.payMethod", { block: true }) + "</div>"
-              : "") +
-            (p.method === "cash" && canCash ? cashBody : qrBody);
-        },
-        foot: () => UI.btn("Đóng", { act: "app.closeModal" }),
-      });
-    },
-    "waiter.payMethod": (d) => { if (S()._pay) { S()._pay.method = d.value; App.render(); } },
-    "waiter.payTipMode": (d) => {
-      const p = S()._pay;
-      if (!p) return;
-      p.tipMode = d.mode;
-      const tk = Engine.ticket(p.ticketId);
-      if (tk) tk.preferredTipMode = d.mode;
-      App.render();
-    },
-    "waiter.whPreset": (d) => { if (S()._pay) { S()._pay.whAmount = Number(d.v) || 0; App.render(); } },
-    "waiter.cashPreset": (d) => { if (S()._pay) { S()._pay.cashReceived = Number(d.v) || 0; App.render(); } },
-    "waiter.cashTipToggle": (d) => { if (S()._pay) { S()._pay.cashOverAsTip = !!d.value; App.render(); } },
-    "waiter.simulateWebhookPay": async () => {
-      const st = S();
-      const p = st._pay;
-      if (!p) return;
-      const me = App.me();
-      const res = App.commit(
-        () =>
-          Engine.processPaymentWebhook({
-            ticketId: p.ticketId,
-            amount: Number(p.whAmount) || 0,
-            content: p.whContent,
-            tipMode: p.tipMode,
-            tipStaffId: p.tipStaffId,
-            by: me.id,
-            gateway: (Store.config.paymentGateway && Store.config.paymentGateway.provider) || "SePay / Casso / VietQR",
-          }),
-        (r) =>
-          r.partial
-            ? "Đã ghi nhận chuyển khoản 1 phần " + U.money(r.received) + " · Còn thiếu " + U.money(r.remaining)
-            : "THANH TOÁN QR THÀNH CÔNG bàn " +
-              r.sale.tableCode +
-              " (" +
-              r.sale.payCode +
-              "): " +
-              U.money(r.receivedTotal || r.received) +
-              (r.tip > 0 ? " · Tip +" + U.money(r.tip) : "")
-      );
-      if (!res) return;
-      if (res.partial) {
-        p.whAmount = res.remaining;
-        p.cashReceived = res.remaining;
-        App.render();
-        return;
+      if (tot.pendingWeigh) {
+        return App.toast("Bàn còn món hải sản chưa cân. Vui lòng chờ cân xong trước khi chuyển in bill.", "error");
       }
-      if (!res.sale) return;
-      st.view = "floor";
-      showPaymentSuccessModal(res.sale);
-    },
-    "waiter.confirmManualPay": () => {
-      const st = S();
-      const p = st._pay;
-      if (!p) return;
-      const me = App.me();
-      const tk = Engine.ticket(p.ticketId);
-      if (!tk) return;
-      const tot = Engine.totals(tk);
-      const need = Math.max(0, tot.due !== undefined ? tot.due : tot.grand - tot.deposit - (tot.paid || 0));
-      const amt = Math.max(need, Number(p.whAmount) || need);
-      const sale = App.commit(
-        () =>
-          Engine.pay(tk.id, {
-            by: me.id,
-            source: "waiter_qr",
-            overAsTip: true,
-            tipMode: p.tipMode,
-            tipStaffId: p.tipStaffId,
-            payments: [{ method: "qr", amount: amt, received: amt }],
-          }),
-        (s) => "Đã thu VietQR tại bàn " + s.tableCode + ": " + U.money(s.received) + (s.tip > 0 ? " (Tip +" + U.money(s.tip) + ")" : "")
+      if (!tk.items.filter((i) => i.status !== "void").length) {
+        return App.toast("Bàn chưa có món nào để thanh toán.", "error");
+      }
+      if (tk.status === "locked" && !tk.prebillOutdated) {
+        const ok = await App.confirm({
+          title: "In lại bill bàn " + table.code + " tại quầy?",
+          message: "Bill bàn <b>" + esc(table.code) + "</b> đã được chuyển in tại quầy thu ngân lúc <b>" + U.time(tk.prebillAt) + "</b> (" + U.money(tot.grand) + "). Bạn có muốn chuyển lệnh in lại 1 bản nữa tại quầy thu ngân?",
+          confirm: "In lại tại quầy",
+        });
+        if (!ok) return;
+      }
+      const job = App.commit(
+        () => Engine.printPrebill(tk.id, me.id),
+        "Đã chuyển in bill Bàn " + table.code + " tại quầy thu ngân!"
       );
-      if (!sale) return;
-      st.view = "floor";
-      showPaymentSuccessModal(sale);
-    },
-    "waiter.confirmCashPay": () => {
-      const st = S();
-      const p = st._pay;
-      if (!p) return;
-      const me = App.me();
-      const tk = Engine.ticket(p.ticketId);
-      if (!tk) return;
-      const amt = Number(p.cashReceived) || 0;
-      const sale = App.commit(
-        () =>
-          Engine.pay(tk.id, {
-            by: me.id,
-            source: "waiter_cash",
-            cashOverAsTip: !!p.cashOverAsTip,
-            tipMode: p.tipMode,
-            tipStaffId: p.tipStaffId,
-            payments: [{ method: "cash", amount: amt, received: amt }],
-          }),
-        (s) => "Đã thu tiền mặt tại bàn " + s.tableCode + ": " + U.money(s.grand) + (s.tip > 0 ? " (Tip +" + U.money(s.tip) + ")" : "")
-      );
-      if (!sale) return;
-      st.view = "floor";
-      showPaymentSuccessModal(sale);
-    },
-    "waiter.closeSuccessPay": () => {
-      App.closeModal(true);
-      S().view = "floor";
-      App.render();
-    },
-    "waiter.prebill": () => {
-      const st = S();
-      const tk = Engine.ticketByTable(st.tableId);
-      App.closeModal(true);
-      App.commit(() => Engine.requestPrebill(tk.id, App.me().id), "Đã báo thu ngân in tạm tính bàn " + Engine.table(st.tableId).code);
+      if (job) App.render();
     },
     "waiter.bottle": () => {
       const st = S();

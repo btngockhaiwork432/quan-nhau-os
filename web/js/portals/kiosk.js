@@ -148,14 +148,14 @@
      THANH TREN, THANH SO LIEU, DAI TON BE
      ===================================================================== */
   function topBar(me, st) {
-    const q = Engine.kitchenQueue().length;
+    const wq = Engine.weighQueue().length;
     const tab = (id, icon, label, extra) => {
       const locked = !canTab(me, id);
       return '<button type="button" class="kiosk-tab' + (st.tab === id ? " active" : "") + (id === "clock" ? " kt-clock" : "") + (locked ? " kx-locked" : "") + '" data-act="kiosk.tab" data-value="' + id + '">' + I(icon) + "<span>" + esc(label) + "</span>" + (locked ? '<span class="kx-tab-lock" title="Không thuộc vị trí của bạn">' + I("lock", "ic-sm") + "</span>" : extra || "") + "</button>";
     };
     const now = Date.now();
     return '<header class="kiosk-top">' +
-      tab("weigh", "utensils", "Đơn bếp & Bể cá", UI.count(q)) +
+      tab("weigh", "fish", "Bể cá & Tồn bếp", wq ? UI.count(wq) : "") +
       tab("waste", "trash-2", "Báo hỏng nguyên liệu") +
       tab("stock", "package", "Nhập / Kiểm kho") +
       '<button type="button" class="kx-operator" data-act="kiosk.switchOp" title="Đổi người thao tác">' + UI.avatar(me.name) +
@@ -170,13 +170,13 @@
     const cards = [];
     if (w.queue !== false) {
       const q = Engine.kitchenQueue();
-      const old = q[0];
+      const last = q.length ? q[q.length - 1] : null;
       cards.push(UI.kpi({
-        label: "Món đang chế biến",
-        icon: "flame",
+        label: "Phiếu đã tự in xuống bếp",
+        icon: "printer",
         value: q.length + " món",
-        meta: old ? "Bàn " + (old.table ? old.table.code : "--") + " · chờ " + UI.since(old.item.sentAt, "mmss") : "Bếp đã ra hết món",
-        tone: old && old.waitMs > lateMs() ? "alert" : "",
+        meta: last ? "Mới nhất: Bàn " + (last.table ? last.table.code : "--") + " lúc " + U.time(last.item.sentAt) + " · Không cần bấm hoàn tất" : "Máy in LAN tự nhả phiếu ngay khi phục vụ gửi",
+        tone: "good",
         act: "kiosk.tab",
         data: { value: "weigh" },
       }));
@@ -235,13 +235,12 @@
      TAB 1 - DON BEP, CHI TIET TUNG CON CA TRONG BE & NANG LUC CHE BIEN MON
      ===================================================================== */
   function weighView(me, st) {
-    const q = Engine.kitchenQueue();
+    const q = Engine.kitchenQueue().slice().reverse();
     const cur = q.find((x) => x.item.id === st.sel) || q[0] || null;
     if (cur) st.sel = cur.item.id;
 
     const queueHtml = q.length
       ? q.map((x) => {
-          const late = x.waitMs > lateMs();
           const style = x.item.styleId ? Engine.style(x.item.styleId) : null;
           const isSea = x.menu.kind === "seafood" || x.item.kind === "seafood";
           const fishTxt = x.item.fishCodes && x.item.fishCodes.length
@@ -250,18 +249,18 @@
               ? (x.item.count ? x.item.count + " con · " : "") + U.kg(x.item.kg)
               : "x" + (x.item.qty || 1) + " " + (x.menu.unit || "phần");
           const sub = [fishTxt, style && style.name, x.item.note].filter(Boolean).join(" · ");
-          return '<button type="button" class="kq-item kx-q' + (cur && x.item.id === cur.item.id ? " active" : "") + (late ? " late" : "") + '" data-act="kiosk.pick" data-item="' + x.item.id + '" data-wsent="' + x.item.sentAt + '">' +
+          return '<button type="button" class="kq-item kx-q' + (cur && x.item.id === cur.item.id ? " active" : "") + '" data-act="kiosk.pick" data-item="' + x.item.id + '" data-wsent="' + x.item.sentAt + '">' +
             '<span class="kq-table">' + esc(x.table ? x.table.code : "--") + "</span>" +
             '<span class="kx-q-main"><b class="truncate">' + esc(x.item.name) + '</b><span class="truncate">' + esc(sub) + "</span></span>" +
-            '<span class="kx-q-right"><span class="kq-timer">' + UI.since(x.item.sentAt, "mmss") + '</span><span class="kx-q-late">Chờ lâu</span></span></button>';
+            '<span class="kx-q-right"><span class="kq-timer">' + U.time(x.item.sentAt) + "</span></span></button>";
         }).join("")
-      : '<div class="kx-placeholder m-12">Tất cả các bàn đã ra đủ món. Chưa có phiếu chế biến mới.</div>';
+      : '<div class="kx-placeholder m-12">Chưa có phiếu món của các bàn đang mở. Khi phục vụ gửi món, máy in LAN trong bếp sẽ tự động nhả phiếu.</div>';
 
     return '<div class="kiosk-body kx-weigh-body">' +
-      '<aside class="kiosk-queue" data-keep-scroll="kq"><div class="kq-head"><span>Đơn bếp đang làm (' + q.length + ')</span><span class="kx-q-hint">Chọn món để ra món</span></div>' + queueHtml + "</aside>" +
+      '<aside class="kiosk-queue" data-keep-scroll="kq"><div class="kq-head"><span>Phiếu đã in xuống bếp (' + q.length + ')</span><span class="kx-q-hint">Tra cứu / In lại</span></div>' + queueHtml + "</aside>" +
       '<section class="kiosk-work kx-weigh" data-keep-scroll="kw">' +
-      (cur ? activeKitchenOrderCard(cur) : "") +
       tankAndMenuCapacitySection() +
+      (cur ? '<div class="mt-16">' + activeKitchenOrderCard(cur) + "</div>" : "") +
       "</section></div>";
   }
 
@@ -275,21 +274,20 @@
       ? (fishCodes ? (it.saleMode === "gram" ? "Cắt lẻ theo gram: " : "Mã cá xuất bể: ") + fishCodes : (it.count ? it.count + " con · " : "") + U.kg(it.kg))
       : "Số lượng: " + (it.qty || 1) + " " + (m.unit || "phần");
 
-    return '<div class="card kx-order-focus mb-16">' +
+    return '<div class="card kx-order-focus">' +
       '<div class="kx-wh">' +
       '<div class="kx-wh-title"><span class="kx-wh-table">Bàn ' + esc(x.table ? x.table.code : "--") + "</span><span>" + esc(it.name) + "</span>" +
       (style ? '<span class="kx-dot-sep"></span><span class="kx-wh-style">' + esc(style.name) + "</span>" : "") +
       "</div>" +
       '<div class="kx-wh-meta">' +
-      "<span>" + I("timer", "ic-sm") + "Chờ " + UI.since(it.sentAt, "mmss") + "</span>" +
+      "<span>" + I("printer", "ic-sm") + "Đã tự in lúc " + U.time(it.sentAt) + "</span>" +
       "<span>" + I(isSea ? "fish" : "utensils", "ic-sm") + "<b>" + esc(qtyLabel) + "</b></span>" +
       "<span>" + I("banknote", "ic-sm") + "Thành tiền: <b>" + U.money(Engine.itemAmount(it)) + "</b></span>" +
       (waiter ? "<span>" + I("user", "ic-sm") + "Phục vụ: " + esc(waiter) + "</span>" : "") +
       "</div></div>" +
       (it.note ? UI.banner("warning", "info", "<b>Ghi chú chế biến của bàn:</b> " + esc(it.note)) : "") +
       '<div class="row gap-12 wrap mt-8">' +
-      kbtn("Hoàn tất chế biến · Báo phục vụ Ra món", "kiosk.serveItem", { kind: "primary", icon: "check", data: { ticket: x.ticket.id, item: it.id } }) +
-      kbtn("In lại phiếu bếp / tem", "kiosk.reprintItem", { icon: "printer", data: { ticket: x.ticket.id, item: it.id } }) +
+      kbtn("In lại phiếu bếp / tem (nếu rách, ướt giấy)", "kiosk.reprintItem", { kind: "primary", icon: "printer", data: { ticket: x.ticket.id, item: it.id } }) +
       "</div></div>";
   }
 
@@ -871,7 +869,7 @@
       '<div class="clock num" data-tick="clock" data-ts="0">' + U.time(now) + "</div>" +
       '<div class="date">' + esc(U.weekday(now)) + ", " + U.date(now) + "</div>" +
       '<div class="hint">' + I("clock") + "Chạm để chấm công</div>" +
-      (q ? '<button type="button" class="kx-idle-q" data-act="kiosk.wakeWeigh">' + I("utensils") + q + " món đang chế biến - chạm để mở Đơn bếp & Bể cá</button>" : "") +
+      '<button type="button" class="kx-idle-q" data-act="kiosk.wakeWeigh">' + I("fish") + "Chạm để mở Bể cá & Kho nguyên liệu bếp</button>" +
       '<div class="kx-idle-meta">' + duty + " người đang trong ca</div></div>";
   }
 
@@ -891,7 +889,7 @@
       if (!st.tab) st.tab = defaultTab(me);
       let body;
       if (st.tab !== "clock" && !canTab(me, st.tab)) {
-        const titles = { weigh: "Đơn bếp & Bể cá dành cho Bếp và Hồ cá", waste: "Báo hỏng nguyên liệu dành cho Bếp và Hồ cá", stock: "Nhập và kiểm kho dành cho Bếp và Hồ cá" };
+        const titles = { weigh: "Bể cá & Tồn bếp dành cho Bếp và Hồ cá", waste: "Báo hỏng nguyên liệu dành cho Bếp và Hồ cá", stock: "Nhập và kiểm kho dành cho Bếp và Hồ cá" };
         body = '<div class="kiosk-body single"><section class="kiosk-work kx-center-pane">' + lockedPanel(me, titles[st.tab] || "Màn hình không thuộc vị trí của bạn") + "</section></div>";
       } else if (st.tab === "waste") body = wasteView(me, st);
       else if (st.tab === "stock") body = stockView(me, st);

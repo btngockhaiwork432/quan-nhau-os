@@ -31,6 +31,7 @@ import db
 
 BACKEND_DIR = Path(__file__).resolve().parent
 WEB_DIR = BACKEND_DIR.parent / "web"
+UI_VERSION = "20261112g"
 
 # Danh sach hang doi SSE cho cac thiet bi dang ket noi
 _sse_Subscribers: Set[asyncio.Queue] = set()
@@ -171,7 +172,7 @@ def api_download_print_agent():
 def api_health():
     try:
         overview = db.get_db_overview()
-        return {"ok": True, **overview}
+        return {"ok": True, "uiVersion": UI_VERSION, **overview}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -179,7 +180,9 @@ def api_health():
 @app.get("/api/db/overview")
 def api_db_overview():
     try:
-        return db.get_db_overview()
+        ov = db.get_db_overview()
+        ov["uiVersion"] = UI_VERSION
+        return ov
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -283,7 +286,7 @@ async def api_sse_events(request: Request):
     async def event_generator():
         try:
             init_msg = json.dumps(
-                {"type": "connected", "revision": db.get_revision(), "at": int(time.time() * 1000)},
+                {"type": "connected", "revision": db.get_revision(), "uiVersion": UI_VERSION, "at": int(time.time() * 1000)},
                 ensure_ascii=False,
             )
             yield f"data: {init_msg}\n\n"
@@ -492,6 +495,137 @@ def api_daily_reports(from_key: Optional[str] = None, to_key: Optional[str] = No
     return {"ok": True, "days": rows}
 
 
+@app.get("/api/reports/sales.csv")
+def api_export_sales_csv(
+    kind: str = Query(default="invoices", pattern="^(daily|invoices|items)$"),
+    from_key: Optional[str] = None,
+    to_key: Optional[str] = None,
+):
+    import csv as _csv
+
+    st = db.load_state_from_postgres() or {}
+    cfg = st.get("config") or {}
+    data = st.get("data") or {}
+    store_cfg = cfg.get("store") or {}
+    staff_map = {s.get("id"): s.get("name") for s in (data.get("staff") or []) if isinstance(s, dict)}
+    sales = [s for s in (data.get("sales") or []) if isinstance(s, dict)]
+    if from_key:
+        sales = [s for s in sales if str(s.get("dayKey") or "") >= from_key]
+    if to_key:
+        sales = [s for s in sales if str(s.get("dayKey") or "") <= to_key]
+    sales.sort(key=lambda x: int(x.get("closedAt") or 0), reverse=True)
+
+    buf = io.StringIO()
+    buf.write("\ufeff")
+    writer = _csv.writer(buf, lineterminator="\r\n")
+    span = f"{from_key or 'all'}_{to_key or 'now'}"
+
+    if kind == "daily":
+        writer.writerow(["BẢNG KÊ THỐNG KÊ DOANH THU BÁN HÀNG THEO NGÀY"])
+        writer.writerow(["Đơn vị", store_cfg.get("name") or "Quán Nhậu OS", "Từ ngày", from_key or "Đầu kỳ", "Đến ngày", to_key or "Hiện tại"])
+        writer.writerow([])
+        writer.writerow(["Ngày", "Số hóa đơn", "Lượt khách", "Doanh thu thuần (đ)", "Tiền mặt (đ)", "Chuyển khoản QR (đ)", "Tiền Tip (đ)", "Giá vốn (đ)", "Lãi gộp (đ)"])
+        by_day: Dict[str, Dict[str, int]] = {}
+        for d in data.get("dailyStats") or []:
+            dk = str(d.get("dayKey") or "")
+            if not dk or (from_key and dk < from_key) or (to_key and dk > to_key):
+                continue
+            by_day[dk] = {
+                "bills": int(d.get("bills") or 0),
+                "guests": int(d.get("guests") or 0),
+                "revenue": int(d.get("revenue") or 0),
+                "cash": int(d.get("cash") or 0),
+                "qr": int(d.get("qr") or 0),
+                "tips": int(d.get("tips") or 0),
+                "cogs": int(d.get("cogs") or 0),
+            }
+        sales_by_day: Dict[str, List[Dict[str, Any]]] = {}
+        for s in sales:
+            dk = str(s.get("dayKey") or "")
+            if dk:
+                sales_by_day.setdefault(dk, []).append(s)
+        for dk, d_sales in sales_by_day.items():
+            if dk not in by_day or len(d_sales) >= by_day[dk]["bills"]:
+                rev = sum(int(x.get("grand") or 0) for x in d_sales)
+                cash = sum(sum(int(p.get("amount") or 0) for p in (x.get("payments") or []) if p.get("method") == "cash") for x in d_sales)
+                qr = sum(sum(int(p.get("amount") or 0) for p in (x.get("payments") or []) if p.get("method") != "cash") for x in d_sales)
+                by_day[dk] = {
+                    "bills": len(d_sales),
+                    "guests": sum(int(x.get("guests") or 0) for x in d_sales),
+                    "revenue": rev,
+                    "cash": cash,
+                    "qr": qr,
+                    "tips": sum(int(x.get("tip") or 0) for x in d_sales),
+                    "cogs": sum(int(x.get("cost") or 0) for x in d_sales),
+                }
+        for dk in sorted(by_day.keys()):
+            r = by_day[dk]
+            writer.writerow([dk, r["bills"], r["guests"], r["revenue"], r["cash"], r["qr"], r["tips"], r["cogs"], r["revenue"] - r["cogs"]])
+        fname = f"bang_ke_doanh_thu_ngay_{span}.csv"
+    elif kind == "items":
+        writer.writerow(["BẢNG KÊ SẢN LƯỢNG & DOANH THU THEO MÓN"])
+        writer.writerow(["Đơn vị", store_cfg.get("name") or "Quán Nhậu OS", "Từ ngày", from_key or "Đầu kỳ", "Đến ngày", to_key or "Hiện tại"])
+        writer.writerow([])
+        writer.writerow(["Mã món", "Tên món", "Sản lượng bán", "Khối lượng (kg)", "Sản lượng tặng KM", "Doanh thu (đ)", "Giá vốn (đ)", "Lãi gộp (đ)"])
+        agg: Dict[str, Dict[str, Any]] = {}
+        for s in sales:
+            for ln in s.get("lines") or []:
+                if ln.get("status") == "void":
+                    continue
+                mid = str(ln.get("menuId") or ln.get("name") or "")
+                a = agg.setdefault(mid, {"id": mid, "name": ln.get("name") or mid, "qty": 0, "kg": 0.0, "free": 0, "amt": 0, "cost": 0})
+                if ln.get("isFree"):
+                    a["free"] += int(ln.get("qty") or 0)
+                    a["cost"] += int(ln.get("cost") or 0)
+                else:
+                    a["qty"] += int(ln.get("qty") or 0)
+                    a["kg"] += float(ln.get("kg") or 0)
+                    a["amt"] += int(ln.get("amount") or 0)
+                    a["cost"] += int(ln.get("cost") or 0)
+        for a in sorted(agg.values(), key=lambda x: x["amt"], reverse=True):
+            writer.writerow([a["id"], a["name"], a["qty"], round(a["kg"], 2), a["free"], a["amt"], a["cost"], a["amt"] - a["cost"]])
+        fname = f"bang_ke_doanh_thu_mon_{span}.csv"
+    else:
+        writer.writerow(["BẢNG KÊ CHI TIẾT HÓA ĐƠN BÁN HÀNG"])
+        writer.writerow(["Đơn vị", store_cfg.get("name") or "Quán Nhậu OS", "Từ ngày", from_key or "Đầu kỳ", "Đến ngày", to_key or "Hiện tại"])
+        writer.writerow([])
+        writer.writerow(["STT", "Mã hóa đơn", "Mã QR", "Ngày", "Bàn", "Số khách", "Phục vụ", "Thu ngân", "Chi tiết món", "Doanh thu thuần (đ)", "Tiền mặt (đ)", "VietQR (đ)", "Tiền Tip (đ)", "Giá vốn (đ)", "Lãi gộp (đ)"])
+        for idx, s in enumerate(sales, 1):
+            cash = sum(int(p.get("amount") or 0) for p in (s.get("payments") or []) if p.get("method") == "cash")
+            qr = sum(int(p.get("amount") or 0) for p in (s.get("payments") or []) if p.get("method") != "cash")
+            items_txt = "; ".join(
+                f"{round(float(ln.get('kg') or 0), 2)}kg {ln.get('name')}" if float(ln.get("kg") or 0) > 0 else f"{ln.get('qty') or 1}x {ln.get('name')}"
+                for ln in (s.get("lines") or [])
+                if ln.get("status") != "void"
+            )
+            grand = int(s.get("grand") or 0)
+            cost = int(s.get("cost") or 0)
+            writer.writerow([
+                idx,
+                s.get("id") or "",
+                s.get("payCode") or "",
+                s.get("dayKey") or "",
+                s.get("tableCode") or s.get("tableId") or "",
+                int(s.get("guests") or 0),
+                staff_map.get(s.get("waiterId"), s.get("waiterId") or ""),
+                staff_map.get(s.get("cashierId"), s.get("cashierId") or ""),
+                items_txt,
+                grand,
+                cash,
+                qr,
+                int(s.get("tip") or 0),
+                cost,
+                grand - cost,
+            ])
+        fname = f"bang_ke_chi_tiet_hoa_don_{span}.csv"
+
+    return Response(
+        content=buf.getvalue().encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @app.get("/api/config")
 def api_get_config():
     rows = db.execute_readonly_sql("SELECT revision, version, updated_at, updated_by, config_json, pending_config FROM system_config WHERE id = 1")
@@ -500,95 +634,393 @@ def api_get_config():
 
 
 # ======================= PAYMENT GATEWAY WEBHOOK API =======================
+# Tuong thich thuc te 100% voi:
+# 1. SePay (my.sepay.vn): Flat JSON {id, gateway, transferType: 'in'|'out', transferAmount, content, description, referenceCode, code} + Header 'Authorization: Apikey <KEY>'
+# 2. Casso Webhook V1 & V2 (casso.vn): Nested JSON {error: 0, data: [...] | {records: [...]} | {id, tid, reference, description, amount}} + Header 'Secure-Token' hoac 'X-Casso-Signature' (HMAC-SHA256)
+# 3. PayOS (payos.vn): Nested JSON {code: '00', data: {orderCode, amount, description, reference}, signature} (bao gom ca goi confirm-webhook ping test)
+# 4. Goi truc tiep / tuy chinh: {amount, content, transactionId, gateway, ticketId, ...}
 
-class PaymentWebhookPayload(BaseModel):
-    amount: Optional[int] = None
-    transferAmount: Optional[int] = None
-    content: Optional[str] = None
-    description: Optional[str] = None
-    memo: Optional[str] = None
-    transactionId: Optional[str] = None
-    referenceCode: Optional[str] = None
-    gateway: Optional[str] = "SePay / Casso / VietQR"
-    ticketId: Optional[str] = None
-    tipMode: Optional[str] = None
-    tipStaffId: Optional[str] = None
-    by: Optional[str] = None
+import hashlib
+import hmac
+import unicodedata
 
 
 def _norm_code(s: str) -> str:
-    return "".join(ch for ch in (s or "").upper() if ch.isalnum())
+    txt = str(s or "").replace("đ", "d").replace("Đ", "D")
+    txt = unicodedata.normalize("NFKD", txt)
+    txt = "".join(ch for ch in txt if not unicodedata.combining(ch))
+    return "".join(ch for ch in txt.upper() if ch.isalnum())
+
+
+def _clean_secret_value(val: str) -> str:
+    s = str(val or "").strip()
+    low = s.lower()
+    if low.startswith("apikey "):
+        return s[7:].strip()
+    if low.startswith("bearer "):
+        return s[7:].strip()
+    return s
+
+
+def _verify_webhook_auth(request: Request, raw_body: bytes, body_dict: Any, expected_secret: str) -> bool:
+    secret = _clean_secret_value(expected_secret)
+    if not secret:
+        return True
+
+    # 1. Kiem tra Header Authorization (SePay: 'Apikey <KEY>' / 'Bearer <KEY>') hoac Secure-Token / X-Webhook-Secret / X-Api-Key
+    candidates: List[str] = []
+    auth_hdr = (request.headers.get("authorization") or "").strip()
+    if auth_hdr:
+        candidates.append(_clean_secret_value(auth_hdr))
+        parts = auth_hdr.split(None, 1)
+        if len(parts) == 2:
+            candidates.append(parts[1].strip())
+    for hdr_name in ("x-webhook-secret", "secure-token", "x-api-key", "apikey"):
+        hv = (request.headers.get(hdr_name) or "").strip()
+        if hv:
+            candidates.append(_clean_secret_value(hv))
+    for qp_name in ("token", "secret", "apikey", "key"):
+        qv = (request.query_params.get(qp_name) or "").strip()
+        if qv:
+            candidates.append(_clean_secret_value(qv))
+
+    for cand in candidates:
+        if cand and hmac.compare_digest(cand, secret):
+            return True
+
+    # 2. Kiem tra chu ky HMAC Casso Webhook V2 ('X-Casso-Signature: t=...,v1=...')
+    casso_sig = (request.headers.get("x-casso-signature") or "").strip()
+    if casso_sig:
+        ts_val = ""
+        v1_val = ""
+        for seg in casso_sig.split(","):
+            if "=" in seg:
+                k, v = seg.split("=", 1)
+                if k.strip() == "t":
+                    ts_val = v.strip()
+                elif k.strip() == "v1":
+                    v1_val = v.strip().lower()
+        if v1_val:
+            raw_str = raw_body.decode("utf-8", errors="replace")
+            sorted_str = json.dumps(body_dict, sort_keys=True, separators=(",", ":"), ensure_ascii=False) if isinstance(body_dict, dict) else raw_str
+            msg_variants = [
+                f"{ts_val}.{sorted_str}" if ts_val else sorted_str,
+                f"{ts_val}.{raw_str}" if ts_val else raw_str,
+                raw_str,
+                sorted_str,
+            ]
+            for mv in msg_variants:
+                for digest_mod in (hashlib.sha256, hashlib.sha512):
+                    calc = hmac.new(secret.encode("utf-8"), mv.encode("utf-8"), digest_mod).hexdigest().lower()
+                    if hmac.compare_digest(calc, v1_val):
+                        return True
+
+    # 3. Kiem tra chu ky PayOS ('signature' trong JSON body)
+    if isinstance(body_dict, dict) and body_dict.get("signature") and isinstance(body_dict.get("data"), dict):
+        payos_sig = str(body_dict.get("signature") or "").strip().lower()
+        d_obj = body_dict["data"]
+        query_str = "&".join(
+            f"{k}={'' if d_obj[k] is None else d_obj[k]}"
+            for k in sorted(d_obj.keys())
+        )
+        calc_payos = hmac.new(secret.encode("utf-8"), query_str.encode("utf-8"), hashlib.sha256).hexdigest().lower()
+        if hmac.compare_digest(calc_payos, payos_sig):
+            return True
+
+    return False
+
+
+def _extract_gateway_transactions(body_dict: Any) -> tuple[List[Dict[str, Any]], bool]:
+    """
+    Chuan hoa payload tu SePay / Casso (v1, v2) / PayOS / Custom JSON thanh danh sach giao dich.
+    Tra ve: (transactions, is_ping)
+    """
+    if not isinstance(body_dict, dict) or not body_dict:
+        return [], True
+    if body_dict.get("isTestPing") or body_dict.get("ping"):
+        return [], True
+
+    # 1. PayOS format: {"code": "00", "data": {"orderCode": ..., "amount": ..., "description": ...}, "signature": ...}
+    if isinstance(body_dict.get("data"), dict) and ("orderCode" in body_dict["data"] or "paymentLinkId" in body_dict["data"]):
+        d = body_dict["data"]
+        desc = str(d.get("description") or "").strip()
+        order_code = d.get("orderCode")
+        # PayOS confirm-webhook test goi orderCode=123, description='VQRIO123'
+        if str(order_code) == "123" and desc.upper() in ("VQRIO123", "TEST", ""):
+            return [], True
+        amt = int(round(float(d.get("amount") or 0)))
+        tx_id = str(d.get("reference") or d.get("paymentLinkId") or f"payos_{order_code}").strip()
+        return [
+            {
+                "amount": amt,
+                "direction": "in" if amt >= 0 else "out",
+                "content": desc or f"ORDER {order_code}",
+                "searchText": f"{desc} {order_code}",
+                "txId": tx_id,
+                "gateway": "PayOS",
+                "ticketId": None,
+                "tipMode": None,
+                "tipStaffId": None,
+                "by": None,
+            }
+        ], False
+
+    # 2. Casso Webhook v1 / v2 format: {"error": 0, "data": [...] | {"records": [...]} | {...}}
+    if "data" in body_dict and body_dict["data"] is not None:
+        raw_data = body_dict["data"]
+        if isinstance(raw_data, list):
+            records = raw_data
+        elif isinstance(raw_data, dict) and isinstance(raw_data.get("records"), list):
+            records = raw_data["records"]
+        elif isinstance(raw_data, dict):
+            records = [raw_data]
+        else:
+            records = []
+        if not records:
+            return [], True
+        out_list: List[Dict[str, Any]] = []
+        for idx, rec in enumerate(records):
+            if not isinstance(rec, dict):
+                continue
+            raw_amt = float(rec.get("amount") if rec.get("amount") is not None else (rec.get("transferAmount") or 0))
+            amt_int = int(round(abs(raw_amt)))
+            t_type = str(rec.get("transferType") or "").strip().lower()
+            direction = "out" if (raw_amt < 0 or t_type == "out") else "in"
+            desc = str(rec.get("description") or rec.get("content") or rec.get("memo") or "").strip()
+            search_txt = " ".join(filter(None, [str(rec.get("code") or ""), str(rec.get("content") or ""), str(rec.get("description") or "")])).strip()
+            tx_id = str(rec.get("tid") or rec.get("reference") or rec.get("referenceCode") or rec.get("id") or f"casso_{int(time.time()*1000)}_{idx}").strip()
+            gw = str(rec.get("bankName") or rec.get("bankAbbreviation") or rec.get("corresponsiveBankName") or body_dict.get("gateway") or "Casso Webhook").strip()
+            out_list.append(
+                {
+                    "amount": amt_int,
+                    "direction": direction,
+                    "content": desc,
+                    "searchText": search_txt or desc,
+                    "txId": tx_id,
+                    "gateway": gw,
+                    "ticketId": rec.get("ticketId"),
+                    "tipMode": rec.get("tipMode"),
+                    "tipStaffId": rec.get("tipStaffId"),
+                    "by": rec.get("by"),
+                }
+            )
+        return (out_list, False) if out_list else ([], True)
+
+    # 3. SePay & Direct / Custom flat JSON
+    raw_amt_field = body_dict.get("amount") if body_dict.get("amount") is not None else body_dict.get("transferAmount")
+    if raw_amt_field is None and not body_dict.get("content") and not body_dict.get("description") and not body_dict.get("ticketId"):
+        return [], True
+    raw_amt = float(raw_amt_field or 0)
+    amt_int = int(round(abs(raw_amt)))
+    t_type = str(body_dict.get("transferType") or "in").strip().lower()
+    direction = "out" if (t_type == "out" or raw_amt < 0) else "in"
+    content_disp = str(body_dict.get("content") or body_dict.get("description") or body_dict.get("memo") or body_dict.get("code") or "").strip()
+    search_txt = " ".join(
+        filter(
+            None,
+            [
+                str(body_dict.get("code") or "").strip(),
+                str(body_dict.get("content") or "").strip(),
+                str(body_dict.get("description") or "").strip(),
+                str(body_dict.get("memo") or "").strip(),
+            ],
+        )
+    ).strip()
+    sepay_id = body_dict.get("id")
+    tx_id = str(
+        body_dict.get("transactionId")
+        or body_dict.get("referenceCode")
+        or (f"sepay_{sepay_id}" if sepay_id is not None else f"tx_{int(time.time() * 1000)}")
+    ).strip()
+    gw = str(body_dict.get("gateway") or "SePay / VietQR").strip()
+    return [
+        {
+            "amount": amt_int,
+            "direction": direction,
+            "content": content_disp,
+            "searchText": search_txt or content_disp,
+            "txId": tx_id,
+            "gateway": gw,
+            "ticketId": body_dict.get("ticketId"),
+            "tipMode": body_dict.get("tipMode"),
+            "tipStaffId": body_dict.get("tipStaffId"),
+            "by": body_dict.get("by"),
+        }
+    ], False
+
+
+def _fmt_vnd_plain(n: int) -> str:
+    return f"{int(round(n or 0)):,}".replace(",", ".")
+
+
+def _hm_str(ms: int) -> str:
+    return time.strftime("%H:%M", time.localtime((ms or int(time.time() * 1000)) / 1000.0))
+
+
+def _resolve_expected_secret(pg_cfg: Dict[str, Any]) -> str:
+    """
+    Uu tien Khoa bao mat Webhook do Chu quan / Dev cau hinh truc tiep tren giao dien Web UI (/owner/settings).
+    Chi fallback sang bien moi truong WEBHOOK_SECRET khi trong config chua co truong webhookSecret.
+    """
+    if isinstance(pg_cfg, dict) and "webhookSecret" in pg_cfg and pg_cfg.get("webhookSecret") is not None:
+        return _clean_secret_value(str(pg_cfg.get("webhookSecret") or ""))
+    return _clean_secret_value(os.environ.get("WEBHOOK_SECRET") or "")
 
 
 @app.get("/api/webhooks/payment")
 def api_list_payment_webhooks(limit: int = Query(50, ge=1, le=200)):
     st = db.load_state_from_postgres()
+    cfg = (st or {}).get("config") or {}
+    pg_cfg = cfg.get("paymentGateway") or {}
     logs = (st.get("data", {}).get("webhookLogs") if st else None) or []
     return {
         "ok": True,
-        "endpoint": "/api/webhooks/payment",
+        "success": True,
+        "endpoint": pg_cfg.get("webhookPath") or "/api/webhooks/payment",
+        "enabled": pg_cfg.get("enabled", True) is not False,
+        "provider": pg_cfg.get("provider") or "SePay / Casso / VietQR",
+        "secretConfigured": bool(_resolve_expected_secret(pg_cfg)),
         "count": len(logs[:limit]),
         "webhooks": logs[:limit],
     }
 
 
-@app.post("/api/webhooks/payment")
-def api_receive_payment_webhook(payload: PaymentWebhookPayload, request: Request):
+@app.post("/api/webhooks/payment/test")
+async def api_test_payment_webhook(request: Request):
+    """
+    Kiem tra ket noi truc tiep tu giao dien Cai dat cua Chu quan (khong tao doanh thu ao):
+    - Xac thuc dung Header / Secret hien tai
+    - Luu 1 dong log 'ping_ok' vao webhookLogs & day SSE de xac minh luong end-to-end hoat dong 100%
+    """
+    raw_body = await request.body()
+    try:
+        body_dict = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except Exception:
+        body_dict = {}
+
     with _state_write_lock:
-        return _process_payment_webhook_locked(payload, request)
+        st = db.load_state_from_postgres()
+        if not st:
+            raise HTTPException(status_code=400, detail="Cơ sở dữ liệu chưa được khởi tạo.")
+        cfg = st.get("config") or {}
+        pg_cfg = cfg.get("paymentGateway") or {}
+        expected_secret = _resolve_expected_secret(pg_cfg)
+        if not _verify_webhook_auth(request, raw_body, body_dict, expected_secret):
+            raise HTTPException(status_code=401, detail="Khóa bảo mật Webhook (API Key / Secret) chưa khớp.")
+
+        now_ms = int(time.time() * 1000)
+        data = st.get("data") or {}
+        webhook_logs = data.setdefault("webhookLogs", [])
+        log_entry = {
+            "id": f"wh_{now_ms}",
+            "txId": f"ping_{now_ms}",
+            "at": now_ms,
+            "gateway": str(body_dict.get("gateway") or pg_cfg.get("provider") or "Kiểm tra kết nối"),
+            "amount": 0,
+            "content": "KIEM TRA KET NOI WEBHOOK",
+            "status": "ping_ok",
+            "reason": "Kết nối cổng thanh toán & xác thực bảo mật thành công",
+        }
+        webhook_logs.insert(0, log_entry)
+        rev = db.persist_state_to_postgres(
+            st,
+            who="webhook_test",
+            audit_text="Kiểm tra kết nối Cổng thanh toán Webhook thành công",
+        )
+    broadcast_event("state_updated", {"revision": rev, "who": "webhook_test", "at": now_ms})
+    return {
+        "ok": True,
+        "success": True,
+        "status": "ping_ok",
+        "secretVerified": bool(expected_secret),
+        "revision": rev,
+        "webhook": log_entry,
+    }
 
 
-def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Request):
+@app.post("/api/webhooks/payment")
+async def api_receive_payment_webhook(request: Request):
+    raw_body = await request.body()
+    if not raw_body or not raw_body.strip():
+        return {"ok": True, "success": True, "ping": True, "message": "Webhook endpoint ready"}
+    try:
+        body_dict = json.loads(raw_body.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Payload JSON không hợp lệ.")
+
+    with _state_write_lock:
+        return _process_payment_webhook_locked(body_dict, raw_body, request)
+
+
+def _process_payment_webhook_locked(body_dict: Any, raw_body: bytes, request: Request):
     """
-    Endpoint nhan Webhook bien dong so du tu cong thanh toan (SePay, Casso, PayOS, VietQR).
-    Dinh danh hoa don qua ma noi dung chuyen khoan (payCode, VD: 'QN A02 1234').
-    Chi can so tien chuyen >= so tien can thanh toan:
-    - Tu dong chot thanh toan bill & dong bo tuc thi len man hinh Phuc vu + Thu ngan.
-    - Phan tien du (over = amount - need > 0) tu dong ghi nhan la Tien Tip va chia theo quy che (personal / pool / area).
+    Xu ly Webhook bien dong so du tu SePay, Casso (V1/V2), PayOS, VietQR:
+    - Tra ve HTTP 200 OK cho moi goi tin hop le (ke ca ping xac thuc cong, giao dich tien ra, giao dich le khong ma ban)
+      de SePay/Casso/PayOS luon xac thuc URL thanh cong ngay lan dau va khong retry spam.
+    - Chi tra HTTP 401 khi giao dich that sai Secret / chu ky HMAC.
+    - Tu dong chot bill + day phieu K80 xuong may in Thu ngan + tach Tien Tip + dong bo SSE tuc thi (< 1 giay).
     """
-    amount = int(payload.amount if payload.amount is not None else (payload.transferAmount or 0))
-    content = (payload.content or payload.description or payload.memo or "").strip()
-    tx_id = (payload.transactionId or payload.referenceCode or f"tx_{int(time.time() * 1000)}").strip()
-    gateway = (payload.gateway or "SePay / Casso / VietQR").strip()
-
-    if amount <= 0:
-        raise HTTPException(status_code=400, detail="Số tiền giao dịch phải lớn hơn 0.")
-    if not content and not payload.ticketId:
-        raise HTTPException(status_code=400, detail="Thiếu nội dung chuyển khoản (content) để định danh bàn.")
+    tx_list, is_ping = _extract_gateway_transactions(body_dict)
+    if is_ping:
+        return {"ok": True, "success": True, "ping": True, "message": "Webhook verified successfully"}
 
     st = db.load_state_from_postgres()
     if not st:
         raise HTTPException(status_code=400, detail="Cơ sở dữ liệu chưa được khởi tạo.")
 
     cfg = st.get("config") or {}
-    expected_secret = (os.environ.get("WEBHOOK_SECRET") or (cfg.get("paymentGateway") or {}).get("webhookSecret") or "").strip()
-    if expected_secret:
-        auth_hdr = (request.headers.get("authorization") or "").strip()
-        sec_hdr = (request.headers.get("x-webhook-secret") or request.headers.get("secure-token") or "").strip()
-        token = sec_hdr
-        if not token and auth_hdr:
-            parts = auth_hdr.split(" ", 1)
-            token = parts[1].strip() if len(parts) > 1 else auth_hdr
-        if token != expected_secret:
-            raise HTTPException(status_code=401, detail="Xác thực Webhook Secret không hợp lệ.")
+    pg_cfg = cfg.get("paymentGateway") or {}
+    expected_secret = _resolve_expected_secret(pg_cfg)
+    if not _verify_webhook_auth(request, raw_body, body_dict, expected_secret):
+        raise HTTPException(status_code=401, detail="Xác thực Webhook Secret / chữ ký không hợp lệ.")
+
+    if pg_cfg.get("enabled", True) is False:
+        return {"ok": True, "success": True, "ignored": "gateway_disabled", "message": "Webhook đang tạm tắt trong Cài đặt."}
+
+    results = []
+    for tx in tx_list:
+        res = _process_single_gateway_tx(st, cfg, tx, request)
+        results.append(res)
+
+    if len(results) == 1:
+        return {"ok": True, "success": True, **results[0]}
+    return {"ok": True, "success": True, "count": len(results), "results": results}
+
+
+def _process_single_gateway_tx(st: Dict[str, Any], cfg: Dict[str, Any], tx: Dict[str, Any], request: Request) -> Dict[str, Any]:
+    amount = int(tx.get("amount") or 0)
+    direction = tx.get("direction") or "in"
+    content = (tx.get("content") or "").strip()
+    search_text = (tx.get("searchText") or content).strip()
+    tx_id = (tx.get("txId") or f"tx_{int(time.time() * 1000)}").strip()
+    gateway = (tx.get("gateway") or "SePay / Casso / VietQR").strip()
+
+    # Bo qua an toan giao dich TIEN RA (VD: chu quan chuyen khoan thanh toan nha cung cap)
+    if direction == "out":
+        return {"matched": False, "ignored": "outgoing_transfer", "txId": tx_id, "amount": amount}
+    if amount <= 0:
+        return {"matched": False, "ignored": "zero_amount", "txId": tx_id}
+
     data = st.get("data") or {}
     now_ms = int(time.time() * 1000)
     webhook_logs = data.setdefault("webhookLogs", [])
 
-    # Kiem tra giao dich trung lap
+    # Kiem tra giao dich trung lap (Idempotency)
     for existing in webhook_logs:
-        if existing.get("txId") == tx_id and existing.get("status") in ("matched_paid", "partial_paid"):
-            return {"ok": True, "duplicate": True, "webhook": existing}
+        if existing.get("txId") == tx_id and existing.get("status") in ("matched_paid", "partial_paid", "matched_booking_deposit"):
+            return {"duplicate": True, "matched": True, "status": existing.get("status"), "webhook": existing}
 
     tickets = data.get("tickets") or []
     tables_list = cfg.get("tables") or (cfg.get("floor") or {}).get("tables") or []
     tables_by_id = {t["id"]: t for t in tables_list if isinstance(t, dict) and "id" in t}
-    norm_content = _norm_code(content)
+    staff_list = data.get("staff") or []
+    staff_name_map = {s.get("id"): s.get("name") for s in staff_list if isinstance(s, dict)}
+    norm_content = _norm_code(search_text)
     prefix = _norm_code((cfg.get("paymentGateway") or {}).get("prefix") or "QN")
 
     matched_tk = None
-    if payload.ticketId:
-        matched_tk = next((t for t in tickets if t.get("id") == payload.ticketId and t.get("status") != "paid"), None)
+    if tx.get("ticketId"):
+        matched_tk = next((t for t in tickets if t.get("id") == tx.get("ticketId") and t.get("status") != "paid"), None)
     if not matched_tk and norm_content:
         for t in tickets:
             if t.get("status") == "paid":
@@ -651,7 +1083,7 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
                             "state_updated",
                             {"revision": rev, "who": "webhook", "auditText": f"Đã nhận cọc đặt bàn {bk_code}", "at": now_ms},
                         )
-                        return {"ok": True, "revision": rev, "booking": bk, "webhook": log_entry}
+                        return {"matched": True, "status": "matched_booking_deposit", "revision": rev, "booking": bk, "webhook": log_entry}
 
         # 2. Kiem tra ngoai le: Ma chuyen khoan khop voi 1 bill DA DONG (khach chuyen trung 2 lan hoac chuyen sau khi da thu tien mat)
         closed_sale = None
@@ -701,8 +1133,20 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
                     "text": warn_msg,
                 },
             )
-            db.persist_state_to_postgres(st, who="webhook", audit_text=warn_msg)
-            raise HTTPException(status_code=409, detail=warn_msg)
+            rev = db.persist_state_to_postgres(st, who="webhook", audit_text=warn_msg)
+            broadcast_event(
+                "payment_webhook",
+                {
+                    "revision": rev,
+                    "webhook": log_entry,
+                    "overpaid": True,
+                    "tableCode": closed_sale.get("tableCode") or "",
+                    "amount": amount,
+                    "reason": warn_msg,
+                    "at": now_ms,
+                },
+            )
+            return {"matched": False, "status": "overpaid_closed_bill", "revision": rev, "warning": warn_msg, "webhook": log_entry}
 
         log_entry = {
             "id": f"wh_{now_ms}",
@@ -712,11 +1156,18 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
             "amount": amount,
             "content": content,
             "status": "unmatched",
-            "reason": "Không tìm thấy bill đang mở khớp mã nội dung chuyển khoản",
+            "reason": "Giao dịch không chứa mã định danh bàn đang mở",
         }
         webhook_logs.insert(0, log_entry)
-        db.persist_state_to_postgres(st, who="webhook", audit_text=f"Webhook QR không khớp bàn: {content} ({amount:,} đ)")
-        raise HTTPException(status_code=404, detail=f"Không tìm thấy bill đang mở khớp nội dung: {content}")
+        rev = db.persist_state_to_postgres(st, who="webhook", audit_text=f"Webhook QR không khớp bàn: {content} ({amount:,} đ)")
+        broadcast_event("state_updated", {"revision": rev, "who": "webhook", "at": now_ms})
+        return {"matched": False, "status": "unmatched", "revision": rev, "webhook": log_entry}
+
+    # Neu ban con hai san chua can -> luu vao payments tam (partial) de khong mat giao dich ngan hang
+    has_pending_weigh = any(
+        it.get("status") == "pending_weigh"
+        for it in (matched_tk.get("items") or [])
+    )
 
     # Tinh tong tien bill
     menu_by_id = {m["id"]: m for m in (cfg.get("menu") or [])}
@@ -725,12 +1176,10 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
     subtotal = 0
     cost_total = 0
     lines = []
-    vat_map: Dict[str, Dict[str, int]] = {"food": {"gross": 0, "vat": 0}, "alcohol": {"gross": 0, "vat": 0}}
+    vat_map: Dict[str, Dict[str, Any]] = {"food": {"gross": 0, "vat": 0, "rate": 8}, "alcohol": {"gross": 0, "vat": 0, "rate": 10}}
     for it in matched_tk.get("items") or []:
-        if it.get("status") == "void":
+        if it.get("status") in ("void", "pending_weigh"):
             continue
-        if it.get("status") == "pending_weigh":
-            raise HTTPException(status_code=400, detail="Bàn còn hải sản chưa cân, chưa thể chốt tự động.")
         m = menu_by_id.get(it.get("menuId"), {})
         st_obj = styles_by_id.get(it.get("styleId") or "", {})
         sur = int(st_obj.get("surcharge") or 0)
@@ -756,7 +1205,8 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
         vg = cat.get("vatGroup") or "food"
         rate = float((cfg.get("tax") or {}).get(vg, (cfg.get("tax", {}).get("vatRates") or {}).get(vg, 8)))
         v_amt = int(round(amt - amt / (1 + rate / 100.0))) if cfg.get("tax", {}).get("pricesIncludeVat", True) else int(round(amt * rate / 100.0))
-        vat_map.setdefault(vg, {"gross": 0, "vat": 0})
+        vat_map.setdefault(vg, {"gross": 0, "vat": 0, "rate": rate})
+        vat_map[vg]["rate"] = rate
         vat_map[vg]["gross"] += amt
         vat_map[vg]["vat"] += v_amt
         lines.append(
@@ -809,9 +1259,9 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
     prior_pays = [p for p in (matched_tk.get("payments") or []) if int(p.get("amount") or 0) > 0]
     prior_paid = sum(int(p.get("amount") or 0) for p in prior_pays)
     due_now = max(0, need - prior_paid)
+    auto_close = (cfg.get("paymentGateway") or {}).get("autoCloseOnFullPay", True) is not False
 
-    if amount < due_now:
-        # Ngoai le: Khach chuyen khoan 1 phan -> ghi nhan vao matched_tk['payments'] va cap nhat so tien con thieu
+    if amount < due_now or has_pending_weigh or not auto_close:
         new_pay = {
             "id": f"pm_{now_ms}",
             "method": "qr",
@@ -826,6 +1276,13 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
         paid_so_far = prior_paid + amount
         remaining_due = max(0, need - paid_so_far)
         tbl_code = tb_info.get("code") or ""
+        reason_txt = (
+            f"Đã ghi nhận {paid_so_far:,} đ (còn hải sản chờ cân)"
+            if has_pending_weigh
+            else f"Đã nhận đủ {paid_so_far:,} đ (chờ thu ngân bấm đóng bill)"
+            if not auto_close and remaining_due == 0
+            else f"Đã thu 1 phần {paid_so_far:,} đ · Còn thiếu {remaining_due:,} đ"
+        )
         log_entry = {
             "id": f"wh_{now_ms}",
             "txId": tx_id,
@@ -842,7 +1299,7 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
             "remaining": remaining_due,
             "waiterId": matched_tk.get("waiterId"),
             "status": "partial_paid",
-            "reason": f"Đã thu 1 phần {paid_so_far:,} đ · Còn thiếu {remaining_due:,} đ",
+            "reason": reason_txt,
         }
         webhook_logs.insert(0, log_entry)
         data.setdefault("notifications", []).insert(
@@ -854,13 +1311,13 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
                 "read": False,
                 "ticketId": matched_tk.get("id"),
                 "waiterId": matched_tk.get("waiterId"),
-                "text": f"Bàn {tbl_code} vừa chuyển khoản 1 phần {amount:,} đ (Đã thu: {paid_so_far:,} đ · Còn thiếu: {remaining_due:,} đ)",
+                "text": f"Bàn {tbl_code} vừa chuyển khoản {amount:,} đ ({reason_txt})",
             },
         )
         rev = db.persist_state_to_postgres(
             st,
             who="webhook",
-            audit_text=f"Webhook QR thu 1 phần bàn {tbl_code}: +{amount:,} đ (Đã thu {paid_so_far:,}/{need:,} đ)",
+            audit_text=f"Webhook QR ghi nhận tiền vào bàn {tbl_code}: +{amount:,} đ ({reason_txt})",
         )
         broadcast_event(
             "payment_webhook",
@@ -878,8 +1335,9 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
             },
         )
         return {
-            "ok": True,
+            "matched": True,
             "partial": True,
+            "status": "partial_paid",
             "revision": rev,
             "ticketId": matched_tk.get("id"),
             "tableCode": tbl_code,
@@ -891,13 +1349,12 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
         }
 
     total_received = prior_paid + amount
-    over_as_tip = (cfg.get("paymentGateway") or {}).get("overpayAsTip", True)
+    over_as_tip = (cfg.get("paymentGateway") or {}).get("overpayAsTip", True) is not False
     tip = max(0, total_received - need) if over_as_tip else 0
-    tip_mode = payload.tipMode or matched_tk.get("preferredTipMode") or (cfg.get("payroll") or {}).get("tipPolicy") or "personal"
-    primary_staff = payload.tipStaffId or matched_tk.get("waiterId") or "s_lan"
+    tip_mode = tx.get("tipMode") or matched_tk.get("preferredTipMode") or (cfg.get("payroll") or {}).get("tipPolicy") or "personal"
+    primary_staff = tx.get("tipStaffId") or matched_tk.get("waiterId") or "s_lan"
 
     # Tinh tipShares
-    staff_list = data.get("staff") or []
     att_list = data.get("attendance") or []
     day_key = time.strftime("%Y-%m-%d", time.localtime(now_ms / 1000.0))
     on_duty_ids = {a.get("staffId") for a in att_list if a.get("dayKey") == day_key and not a.get("out")}
@@ -943,7 +1400,7 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
         "dayKey": day_key,
         "shiftId": sh.get("id") if sh else None,
         "waiterId": matched_tk.get("waiterId"),
-        "cashierId": payload.by or matched_tk.get("waiterId") or (sh.get("cashierId") if sh else "s_thu"),
+        "cashierId": tx.get("by") or matched_tk.get("waiterId") or (sh.get("cashierId") if sh else "s_thu"),
         "paidByRole": "webhook_qr",
         "paymentSource": "webhook_qr",
         "webhookTxId": tx_id,
@@ -972,6 +1429,88 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
     data["tickets"] = [t for t in tickets if t.get("id") != matched_tk["id"]]
     data.setdefault("tableState", {})[matched_tk["tableId"]] = {"status": "dirty", "since": now_ms}
     data["lastBillClosedAt"] = max(int(data.get("lastBillClosedAt") or 0), now_ms)
+
+    # Hoan tat booking lien ket (neu co) & xoa thong bao xin in tam tinh cu
+    if matched_tk.get("bookingId"):
+        for bk in data.get("bookings") or []:
+            if bk.get("id") == matched_tk.get("bookingId"):
+                bk["status"] = "completed"
+    data["notifications"] = [
+        n for n in (data.get("notifications") or [])
+        if not (n.get("type") == "prebill_request" and n.get("ticketId") == matched_tk["id"])
+    ]
+
+    # Day tu dong HOA DON THANH TOAN K80 vao hang doi in (printLog) de may in Thu ngan tu nha bill (< 2s)
+    store_cfg = cfg.get("store") or {}
+    rc_cfg = cfg.get("receipt") or {}
+    printers = cfg.get("printers") or []
+    cashier_pr = next((p for p in printers if p.get("id") == "p_cashier"), None) or next((p for p in printers if p.get("purpose") == "bill"), None)
+    rerouted_from: Any = False
+    if cashier_pr and not cashier_pr.get("online", True) and cashier_pr.get("backupId"):
+        bk_pr = next((p for p in printers if p.get("id") == cashier_pr.get("backupId") and p.get("online", True)), None)
+        if bk_pr:
+            rerouted_from = cashier_pr.get("name") or "Máy in Thu ngân"
+            cashier_pr = bk_pr
+    sum_rows: List[Dict[str, Any]] = [{"l": "Cộng tiền hàng", "r": _fmt_vnd_plain(subtotal)}]
+    if vip_fee:
+        sum_rows.append({"l": "Phụ thu phòng VIP", "r": _fmt_vnd_plain(vip_fee)})
+    if discount:
+        sum_rows.append({"l": "Giảm giá", "r": "-" + _fmt_vnd_plain(discount)})
+    sum_rows.append({"l": "TỔNG CỘNG", "r": _fmt_vnd_plain(grand), "bold": True, "big": True})
+    if deposit:
+        sum_rows.append({"l": "Đã đặt cọc", "r": "-" + _fmt_vnd_plain(deposit)})
+    vat_notes = []
+    if cfg.get("tax", {}).get("pricesIncludeVat", True) and rc_cfg.get("showVatNote", True):
+        for g_key, vg_info in vat_map.items():
+            if vg_info.get("gross", 0) > 0:
+                vat_notes.append(f"Giá đã gồm VAT {int(vg_info.get('rate') or 8)}%: {_fmt_vnd_plain(vg_info.get('vat') or 0)}")
+    origin_url = f"{request.url.scheme}://{request.headers.get('host') or 'munbao.com'}"
+    inv_code = sale_id[-8:].upper()
+    receipt_doc = {
+        "id": f"pr_{now_ms}",
+        "at": now_ms,
+        "printerId": cashier_pr.get("id") if cashier_pr else "p_cashier",
+        "printerName": cashier_pr.get("name") if cashier_pr else "Máy in Thu ngân",
+        "rerouted": rerouted_from,
+        "failed": bool(not cashier_pr or not cashier_pr.get("online", True)),
+        "kind": "receipt",
+        "title": "HÓA ĐƠN THANH TOÁN",
+        "header": [store_cfg.get("name") or "QUÁN NHẬU", store_cfg.get("address") or "", "ĐT: " + str(store_cfg.get("phone") or "")],
+        "meta": [
+            {"l": "Bàn", "r": sale_obj["tableCode"]},
+            {"l": "Giờ vào", "r": _hm_str(sale_obj["openedAt"])},
+            {"l": "Giờ ra", "r": _hm_str(now_ms)},
+            {"l": "Số khách", "r": str(sale_obj["guests"])},
+            {"l": "Phục vụ", "r": staff_name_map.get(sale_obj["waiterId"]) or "-"},
+            {"l": "Thanh toán", "r": f"VietQR ({sale_obj['payCode']})"},
+        ],
+        "rows": [
+            {
+                "l": (f"{round(float(ln.get('kg') or 0), 2)}kg " if float(ln.get("kg") or 0) > 0 else f"{ln.get('qty') or 1}x ")
+                + str(ln.get("name") or "")
+                + (" (Tặng)" if ln.get("isFree") else ""),
+                "r": _fmt_vnd_plain(int(ln.get("amount") or 0)),
+            }
+            for ln in lines
+        ],
+        "sumRows": sum_rows,
+        "payments": all_pays,
+        "change": 0,
+        "tip": tip,
+        "vatNote": vat_notes,
+        "qr": f"{origin_url}/customer?inv={inv_code}" if rc_cfg.get("showQr", True) else None,
+        "qrLabel": rc_cfg.get("footer") or "Quét mã xuất hóa đơn VAT trong 24h",
+        "saleId": sale_id,
+        "footer": [
+            f"Wi-Fi: {store_cfg.get('wifiName')} / {store_cfg.get('wifiPass')}" if rc_cfg.get("showWifi") and store_cfg.get("wifiName") else None,
+            store_cfg.get("thanks") or "Cảm ơn quý khách & hẹn gặp lại!",
+        ],
+    }
+    receipt_doc["footer"] = [f for f in receipt_doc["footer"] if f]
+    print_log = data.setdefault("printLog", [])
+    print_log.insert(0, receipt_doc)
+    if len(print_log) > 80:
+        del print_log[80:]
 
     log_entry = {
         "id": f"wh_{now_ms}",
@@ -1009,7 +1548,7 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
 
     rev = db.persist_state_to_postgres(
         st,
-        who=payload.by or sale_obj["waiterId"] or "webhook",
+        who=tx.get("by") or sale_obj["waiterId"] or "webhook",
         audit_text=f"Webhook QR tự động chốt bàn {sale_obj['tableCode']} ({sale_obj['payCode']}): nhận {amount:,} đ / cần {need:,} đ" + (f", Tip +{tip:,} đ ({tip_mode})" if tip > 0 else ""),
     )
     broadcast_event(
@@ -1027,7 +1566,8 @@ def _process_payment_webhook_locked(payload: PaymentWebhookPayload, request: Req
         },
     )
     return {
-        "ok": True,
+        "matched": True,
+        "status": "matched_paid",
         "revision": rev,
         "sale": sale_obj,
         "webhook": log_entry,
@@ -1084,11 +1624,28 @@ def api_lookup_tax_code(tax_code: str):
     return {"ok": False}
 
 
+_STATIC_EXTS = (".js", ".css", ".woff2", ".woff", ".ttf", ".png", ".jpg", ".jpeg", ".svg", ".ico", ".json", ".map")
+
+
 def _serve_spa_index():
     return FileResponse(
         str(WEB_DIR / "index.html"),
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
+
+
+def _serve_spa_subpath(subpath: str = ""):
+    rel = (subpath or "").lstrip("/")
+    if rel and (rel.startswith(("js/", "css/", "fonts/")) or rel.lower().endswith(_STATIC_EXTS)):
+        candidate = (WEB_DIR / rel).resolve()
+        try:
+            candidate.relative_to(WEB_DIR.resolve())
+        except ValueError:
+            raise HTTPException(status_code=404)
+        if candidate.is_file():
+            return FileResponse(str(candidate))
+        raise HTTPException(status_code=404)
+    return _serve_spa_index()
 
 
 @app.get("/", include_in_schema=False)
@@ -1098,7 +1655,7 @@ def _serve_root_index():
 
 for _p in _SPA_PORTALS:
     app.add_api_route(f"/{_p}", _serve_spa_index, methods=["GET"], include_in_schema=False)
-    app.add_api_route(f"/{_p}/{{subpath:path}}", _serve_spa_index, methods=["GET"], include_in_schema=False)
+    app.add_api_route(f"/{_p}/{{subpath:path}}", _serve_spa_subpath, methods=["GET"], include_in_schema=False)
 
 
 # Phuc vu toan bo giao dien Web tinh (C:/quan_nhau/web)

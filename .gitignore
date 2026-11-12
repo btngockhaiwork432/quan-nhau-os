@@ -13,3 +13,7 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Office temp lock files & local printer runtime cache
+~$*
+print_agent/printer_cache.json
