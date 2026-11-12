@@ -2,7 +2,7 @@
 chcp 65001 >nul
 title Cai Tu Khoi Dong Cung Windows - Quan Nhau Print Bridge
 set "STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "TARGET_BAT=%~dp0CHAY_KET_NOI_MAY_IN_LAN.bat"
+set "TARGET_BAT=%~dp02_CHAY_KET_NOI_MAY_IN.bat"
 set "SHORTCUT_VBS=%TEMP%\create_qn_print_shortcut.vbs"
 
 echo Set oWS = WScript.CreateObject("WScript.Shell") > "%SHORTCUT_VBS%"

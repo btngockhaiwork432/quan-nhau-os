@@ -1315,7 +1315,7 @@
       if (!sh) return;
       App.commit(() => {
         sh.status = "open";
-        delete sh.autoLockedAt;
+        sh.autoLockedAt = sh.autoLockedAt || Date.now();
       }, "Đã mở khóa ca thu ngân");
       App.render();
     },

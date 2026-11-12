@@ -31,7 +31,7 @@ import db
 
 BACKEND_DIR = Path(__file__).resolve().parent
 WEB_DIR = BACKEND_DIR.parent / "web"
-UI_VERSION = "20261112g"
+UI_VERSION = "20261112h"
 
 # Danh sach hang doi SSE cho cac thiet bi dang ket noi
 _sse_Subscribers: Set[asyncio.Queue] = set()
@@ -160,7 +160,7 @@ def api_download_print_agent():
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         for p in sorted(agent_dir.iterdir()):
-            if p.is_file():
+            if p.is_file() and not p.name.startswith(".") and p.name != "printer_cache.json" and not p.name.endswith(".pyc"):
                 zf.write(str(p), arcname=f"QuanNhau_MayIn_LAN/{p.name}")
     return Response(
         content=mem.getvalue(),

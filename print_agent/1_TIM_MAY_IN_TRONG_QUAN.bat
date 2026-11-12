@@ -3,8 +3,16 @@ chcp 65001 >nul
 title Cong Cu Tu Dong Do Tim May In (USB va Wi-Fi/LAN) - Quan Nhau OS
 cd /d "%~dp0"
 
-where python >nul 2>nul
-if %errorlevel% neq 0 (
+set "PY_CMD="
+python -c "import sys" >nul 2>nul
+if %errorlevel% equ 0 (
+    set "PY_CMD=python"
+) else (
+    py -3 -c "import sys" >nul 2>nul
+    if not errorlevel 1 set "PY_CMD=py -3"
+)
+
+if "%PY_CMD%"=="" (
     echo ====================================================================
     echo [CHUA CAI PYTHON] May tinh nay chua cai Python 3.
     echo Hay tai Python 3 mien phi tai https://www.python.org/downloads/
@@ -14,6 +22,6 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-python quannhau_print_bridge.py --scan
+%PY_CMD% quannhau_print_bridge.py --scan
 echo.
 pause

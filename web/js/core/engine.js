@@ -3220,9 +3220,13 @@
       changed = true;
     }
     const sh = d.shift;
-    if (sh && sh.status === "open" && C().locks.zLockEnabled) {
+    if (sh && sh.status === "open" && !sh.autoLockedAt && C().locks.zLockEnabled && E.openTickets().length === 0) {
       const lockAt = U.atTime(C().locks.zLockTime, sh.dayKey);
-      if (now > lockAt && now - lockAt < 6 * 3600000) { sh.status = "auto_locked"; sh.autoLockedAt = now; changed = true; }
+      if ((sh.openedAt || 0) < lockAt && now > lockAt && now - lockAt < 6 * 3600000) {
+        sh.status = "auto_locked";
+        sh.autoLockedAt = now;
+        changed = true;
+      }
     }
     return changed;
   };

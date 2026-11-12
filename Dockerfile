@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir fastapi uvicorn[standard] psycopg2-binary sqlalch
 
 COPY backend /app/backend
 COPY web /app/web
+COPY print_agent /app/print_agent
 
 WORKDIR /app/backend
 EXPOSE 8765
